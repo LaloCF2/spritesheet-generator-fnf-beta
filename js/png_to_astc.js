@@ -252,6 +252,19 @@
         setTxt('lblTotalBlocks', `${totalBlocks} (${blocksX} × ${blocksY})`);
         setTxt('lblRamSavings', `-${vramSavingsPercent}% en VRAM`);
 
+        // Alerta inteligente de textura grande (> 1.8 MB en escala 1:1)
+        const boxAlert = document.getElementById('boxLargeTextureAlert');
+        const txtAlertOrig = document.getElementById('txtAlertOrigWeight');
+        const raw100Bytes = (Math.ceil(origW / 6) * Math.ceil(origH / 6)) * 16 + 16;
+        if (boxAlert && txtAlertOrig) {
+            if (raw100Bytes > 1.8 * 1024 * 1024 && estimatedAstcBytes > 1.2 * 1024 * 1024) {
+                boxAlert.style.display = 'flex';
+                txtAlertOrig.textContent = formatBytes(raw100Bytes);
+            } else {
+                boxAlert.style.display = 'none';
+            }
+        }
+
         if (currentPngFile && currentPngFile.size > 0) {
             const ratio = ((1 - (estimatedAstcBytes / currentPngFile.size)) * 100).toFixed(1);
             const ratioEl = document.getElementById('lblEstRatio');
@@ -265,6 +278,58 @@
         }
 
         renderPreview();
+    }
+
+    // Auto-Ajuste inteligente para que el archivo pese estrictamente < 1 MB en Android
+    function autoTuneForMobile() {
+        if (!currentImage) return;
+        const origW = currentImage.naturalWidth || currentImage.width;
+        const origH = currentImage.naturalHeight || currentImage.height;
+
+        // Meta: Que pese entre 350 KB y 950 KB (estrictamente menos de 1 MB)
+        const targetBytes = 900 * 1024; // 900 KB
+        const availableScales = [1.0, 0.85, 0.75, 0.50, 0.35, 0.25];
+        const availableBlocks = ['6x6', '8x8', '10x10', '12x12'];
+
+        let bestScale = '0.50';
+        let bestBlock = '8x8';
+        let found = false;
+
+        // Buscar la combinación con mejor nitidez que cumpla <= targetBytes
+        for (let s of availableScales) {
+            for (let b of availableBlocks) {
+                const parts = b.split('x').map(Number);
+                const bx = parts[0], by = parts[1];
+                const tw = Math.max(4, Math.round(origW * s));
+                const th = Math.max(4, Math.round(origH * s));
+                const bytes = (Math.ceil(tw / bx) * Math.ceil(th / by)) * 16 + 16;
+                if (bytes <= targetBytes) {
+                    bestScale = (s === 1.0) ? '1.0' : s.toFixed(2);
+                    bestBlock = b;
+                    found = true;
+                    break;
+                }
+            }
+            if (found) break;
+        }
+
+        if (!found) {
+            bestScale = '0.25';
+            bestBlock = '10x10';
+        }
+
+        if (selTextureScale) selTextureScale.value = bestScale;
+        if (selBlockSize) selBlockSize.value = bestBlock;
+        setQualityMode('framebyframe');
+        if (chkCleanAlpha) chkCleanAlpha.checked = true;
+        if (chkFlipY) chkFlipY.checked = false;
+
+        updateEstimates();
+    }
+
+    const btnAutoTuneMobile = document.getElementById('btnAutoTuneMobile');
+    if (btnAutoTuneMobile) {
+        btnAutoTuneMobile.addEventListener('click', autoTuneForMobile);
     }
 
     // 3 Botones de Calidad de Codificación y Modo de Limpieza
@@ -333,14 +398,7 @@
 
     if (btnPresetUltraLight) {
         btnPresetUltraLight.addEventListener('click', () => {
-            // Consejo Oficial Arm ASTC: Reduce resolución en vez de usar bloques extremos
-            // 50% escala con bloque 8x8 produce texturas entre 80 KB y 300 KB impecables sin halos
-            if (selTextureScale) selTextureScale.value = '0.50';
-            if (selBlockSize) selBlockSize.value = '8x8';
-            setQualityMode('framebyframe');
-            if (chkCleanAlpha) chkCleanAlpha.checked = true;
-            if (chkFlipY) chkFlipY.checked = false;
-            updateEstimates();
+            autoTuneForMobile();
         });
     }
 
@@ -365,7 +423,7 @@
                     currentImage = img;
                     currentAstcResult = null;
 
-                    // Ajuste estándar oficial Psych Mobile: Bloque 6x6, Modo Frame por Frame (sin distorsión)
+                    // Ajuste estándar oficial Psych Mobile: Bloque 6x6, Modo Frame por Frame
                     if (selBlockSize) selBlockSize.value = '6x6';
                     setQualityMode('framebyframe');
                     if (selTextureScale) selTextureScale.value = '1.0';
@@ -380,6 +438,14 @@
                     }
 
                     updateEstimates();
+
+                    // Si la textura es grande (pesaría > 1.2 MB en 100%), auto-ajustar directamente a < 1 MB
+                    const origW = img.naturalWidth || img.width;
+                    const origH = img.naturalHeight || img.height;
+                    const rawWeight = (Math.ceil(origW / 6) * Math.ceil(origH / 6)) * 16 + 16;
+                    if (rawWeight > 1.2 * 1024 * 1024) {
+                        autoTuneForMobile();
+                    }
 
                     if (configContainer) configContainer.style.display = 'block';
                     if (resultContainer) resultContainer.style.display = 'none';
@@ -490,16 +556,27 @@
 
     function showLoader() {
         if (globalLoader) {
+            globalLoader.classList.remove('hidden');
+            globalLoader.style.setProperty('display', 'flex', 'important');
+            globalLoader.style.setProperty('opacity', '1', 'important');
+            globalLoader.style.setProperty('visibility', 'visible', 'important');
+            globalLoader.style.setProperty('pointer-events', 'auto', 'important');
             updateLoader(0, 'Subiendo imagen...', 'Iniciando transferencia de textura a memoria...');
-            globalLoader.style.display = 'flex';
         }
     }
 
     function hideLoader() {
         if (globalLoader) {
-            globalLoader.style.display = 'none';
+            globalLoader.classList.add('hidden');
+            globalLoader.style.setProperty('display', 'none', 'important');
+            globalLoader.style.setProperty('opacity', '0', 'important');
+            globalLoader.style.setProperty('visibility', 'hidden', 'important');
+            globalLoader.style.setProperty('pointer-events', 'none', 'important');
         }
     }
+
+    // Inicializar oculto en carga de página
+    hideLoader();
 
     let currentDecodedCanvas = null;
     let isProcessing = false;
@@ -514,6 +591,8 @@
 
         isProcessing = true;
         showLoader();
+        // Dar tiempo al navegador para renderizar el spinner y el modal antes de procesar
+        await new Promise(r => setTimeout(r, 60));
 
         try {
             const { bx, by } = getSelectedBlock();
@@ -528,25 +607,20 @@
             const bpp = (128 / (bx * by)).toFixed(2);
 
             // FASE 1: Subiendo imagen... (0% -> 18%)
-            // Debe durar un buen rato mostrando la frase como solicitó el usuario
             updateLoader(0, 'Subiendo imagen...', 'Transfiriendo buffer de píxeles PNG a la memoria interna...');
             await new Promise(r => setTimeout(r, 260));
-            updateLoader(6, 'Subiendo imagen...', 'Reservando buffer GPU y cargando cabeceras...');
-            await new Promise(r => setTimeout(r, 260));
-            updateLoader(12, 'Subiendo imagen...', 'Optimizando memoria intermedia para texturas nativas...');
+            updateLoader(8, 'Subiendo imagen...', 'Reservando buffer GPU y cargando cabeceras...');
             await new Promise(r => setTimeout(r, 260));
             updateLoader(18, 'Subiendo imagen...', 'Carga en memoria completada.');
-            await new Promise(r => setTimeout(r, 180));
+            await new Promise(r => setTimeout(r, 200));
 
             // FASE 2: Leyendo imagen... (18% -> 38%)
             updateLoader(22, 'Leyendo imagen...', `Analizando canal RGBA (${origW}×${origH} px) y espacio de color...`);
             await new Promise(r => setTimeout(r, 220));
-            updateLoader(28, 'Leyendo imagen...', 'Evaluando mapa alfa y transparencia de fotogramas...');
+            updateLoader(30, 'Leyendo imagen...', 'Evaluando mapa alfa y transparencia de fotogramas...');
             await new Promise(r => setTimeout(r, 220));
-            updateLoader(34, 'Leyendo imagen...', currentXmlData ? `Sincronizando ${currentXmlData.count} fotogramas del XML Sparrow...` : 'Escaneando límites y distribución de fotogramas...');
-            await new Promise(r => setTimeout(r, 220));
-            updateLoader(38, 'Leyendo imagen...', 'Imagen leída y mapeada con éxito.');
-            await new Promise(r => setTimeout(r, 160));
+            updateLoader(38, 'Leyendo imagen...', currentXmlData ? `Sincronizando ${currentXmlData.count} fotogramas del XML Sparrow...` : 'Escaneando límites y distribución de fotogramas...');
+            await new Promise(r => setTimeout(r, 200));
 
             // FASE 3: Escaneo IA: Eliminando halos y purgando fondos... (38% -> 68%)
             let scanSubtext = 'Escaneando imagen y eliminando residuos de fondo...';
@@ -558,7 +632,7 @@
                 scanSubtext = 'IA Profunda multi-pasada: erradicando croma de escenario, de-fringing y sellando bordes...';
             }
 
-            updateLoader(42, 'Escaneo IA: Eliminando halos y purgando fondos...', scanSubtext);
+            updateLoader(45, 'Escaneo IA: Eliminando halos y purgando fondos...', scanSubtext);
             await new Promise(r => setTimeout(r, 250));
 
             // Crear lienzo de trabajo con la orientación y escala correctas
@@ -579,16 +653,14 @@
                 ctx.drawImage(currentImage, 0, 0, targetW, targetH);
             }
 
-            updateLoader(50, 'Escaneo IA: Eliminando halos y purgando fondos...', 'Detectando croma de escenario Flash/Photoshop (blanco / púrpura)...');
+            updateLoader(55, 'Escaneo IA: Eliminando halos y purgando fondos...', 'Detectando croma de escenario Flash/Photoshop (blanco / púrpura)...');
             await new Promise(r => setTimeout(r, 250));
-            updateLoader(58, 'Escaneo IA: Eliminando halos y purgando fondos...', 'Aplicando sangrado de color activo hacia píxeles vacíos...');
-            await new Promise(r => setTimeout(r, 250));
-            updateLoader(68, 'Escaneo IA: Eliminando halos y purgando fondos...', 'Fondo purgado y bordes sellados sin contaminación.');
+            updateLoader(65, 'Escaneo IA: Eliminando halos y purgando fondos...', 'Fondo purgado y bordes sellados sin contaminación.');
             await new Promise(r => setTimeout(r, 180));
 
             // FASE 4: Codificando textura ASTC nativa con Arm astcenc... (68% -> 88%)
             updateLoader(72, 'Codificando textura ASTC nativa con Arm astcenc...', `Comprimiendo bloques ${bx}×${by} (${bpp} bpp) con ponderación alfa oficial...`);
-            await new Promise(r => setTimeout(r, 100));
+            await new Promise(r => setTimeout(r, 200));
 
             const startTime = performance.now();
 
@@ -608,22 +680,23 @@
                 bleedAlpha: chkCleanAlpha ? chkCleanAlpha.checked : true
             });
 
-            updateLoader(82, 'Codificando textura ASTC nativa con Arm astcenc...', 'Generando bloques físicos ASTC de 128 bits...');
-            await new Promise(r => setTimeout(r, 150));
-            updateLoader(88, 'Codificando textura ASTC nativa con Arm astcenc...', 'Empaquetando cabecera oficial de 16 bytes y finalizando binario...');
-            await new Promise(r => setTimeout(r, 150));
+            updateLoader(85, 'Codificando textura ASTC nativa con Arm astcenc...', 'Generando bloques físicos ASTC de 128 bits...');
+            await new Promise(r => setTimeout(r, 160));
+            updateLoader(90, 'Codificando textura ASTC nativa con Arm astcenc...', 'Empaquetando cabecera oficial de 16 bytes y finalizando binario...');
+            await new Promise(r => setTimeout(r, 160));
 
             // FASE 5: Verificando integridad y decodificando prueba... (88% -> 99%)
-            updateLoader(92, 'Verificando integridad y decodificando prueba...', 'Decodificando textura ASTC generada con WebAssembly...');
+            updateLoader(94, 'Verificando integridad y decodificando prueba...', 'Decodificando textura ASTC generada con WebAssembly...');
 
-            // Decodificar los bytes ASTC reales para obtener la vista previa exacta del juego
-            const decoded = await window.ASTCEngine.astcToCanvas(result.astcBytes);
-            currentDecodedCanvas = decoded;
+            // Decodificar textura ASTC para la vista previa (con flipY: isFlipped para verla DE PIE, cabeza arriba)
+            const decodedResult = await window.ASTCEngine.astcToCanvas(result.astcBytes, { flipY: isFlipped });
+            const decodedCanvas = (decodedResult && decodedResult.canvas) ? decodedResult.canvas : decodedResult;
+            currentDecodedCanvas = decodedCanvas;
 
-            updateLoader(96, 'Verificando integridad y decodificando prueba...', 'Auditoría IA de píxeles decodificados: buscando residuos o halos...');
+            updateLoader(98, 'Verificando integridad y decodificando prueba...', 'Auditoría IA de píxeles decodificados: buscando residuos o halos...');
 
             // Auditar la textura decodificada
-            const audit = window.ASTCEngine.auditTexture(decoded, xmlFramesScaled);
+            const audit = window.ASTCEngine.auditTexture(decodedCanvas, xmlFramesScaled);
 
             updateLoader(99, 'Verificando integridad y decodificando prueba...', 'Textura decodificada y auditada con éxito.');
             await new Promise(r => setTimeout(r, 200));
@@ -631,7 +704,7 @@
             // FASE 6: ¡Rectificando textura final al 100%!
             // El usuario pidió explícitamente: "y que en 100 se quede un buen rato para reitificar que todo se hizo perfectamente"
             updateLoader(100, '¡Rectificando textura final al 100%!', 'Textura verificada y certificada sin fallas. Lista para FNF Android.');
-            await new Promise(r => setTimeout(r, 1400)); // Quedarse un buen rato en 100%
+            await new Promise(r => setTimeout(r, 1400)); // Quedarse un buen rato en 100% como solicitó el usuario
 
             const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
 
@@ -646,14 +719,14 @@
                 audit
             };
 
-            // Dibujar la vista previa real decodificada en resAstcPreviewCanvas
+            // Dibujar la vista previa real decodificada en resAstcPreviewCanvas (DE PIE)
             const previewCanvas = document.getElementById('resAstcPreviewCanvas');
-            if (previewCanvas && decoded) {
-                previewCanvas.width = decoded.width;
-                previewCanvas.height = decoded.height;
+            if (previewCanvas && decodedCanvas) {
+                previewCanvas.width = decodedCanvas.width;
+                previewCanvas.height = decodedCanvas.height;
                 const pCtx = previewCanvas.getContext('2d');
-                pCtx.clearRect(0, 0, decoded.width, decoded.height);
-                pCtx.drawImage(decoded, 0, 0);
+                pCtx.clearRect(0, 0, decodedCanvas.width, decodedCanvas.height);
+                pCtx.drawImage(decodedCanvas, 0, 0);
             }
 
             // Actualizar tarjetas de estadísticas

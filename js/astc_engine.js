@@ -135,7 +135,8 @@
     }
 
     function astcToCanvas(fileBytes, options = {}) {
-        const flipY = options.flipY !== undefined ? options.flipY : true;
+        // Por defecto false: mantiene la imagen derecha y de pie (cabeza arriba y pies abajo)
+        const flipY = options.flipY === true;
         const decoded = decodeAstc(fileBytes);
         
         let canvas = document.createElement('canvas');
@@ -287,6 +288,20 @@
         const gCopy = new Uint8Array(totalPixels);
         const bCopy = new Uint8Array(totalPixels);
 
+        // Umbrales agresivos para erradicar al 100% halos morados y blancos
+        let hardAlphaCutoff = 35;
+        let stageAlphaCutoff = 140;
+        if (mode === 'normal') {
+            hardAlphaCutoff = 25;
+            stageAlphaCutoff = 100;
+        } else if (mode === 'framebyframe') {
+            hardAlphaCutoff = 45;
+            stageAlphaCutoff = 160;
+        } else if (mode === 'advanced') {
+            hardAlphaCutoff = 60;
+            stageAlphaCutoff = 190;
+        }
+
         for (let i = 0, p = 0; i < data.length; i += 4, p++) {
             // Si hay XML y el píxel está fuera de TODOS los frames, purgar a 0 absoluto inmediatamente
             if (inFrameMask && inFrameMask[p] === 0) {
@@ -299,24 +314,31 @@
             }
 
             const a = data[i + 3];
+            if (a === 0) {
+                isOpaque[p] = 0;
+                continue;
+            }
+
             const r = data[i];
             const g = data[i + 1];
             const b = data[i + 2];
 
             // Distancia de color al fondo de escenario detectado
             const distBg = sampleCount > 0 ? Math.sqrt((r - bgR) ** 2 + (g - bgG) ** 2 + (b - bgB) ** 2) : 999;
-            // También comprobar blanco puro / gris de Flash (#FFFFFF / #EEEEEE)
+            // Distancia a blanco puro / gris Flash (#FFFFFF / #E5E5E5)
             const distWhite = Math.sqrt((r - 255) ** 2 + (g - 255) ** 2 + (b - 255) ** 2);
-            // Púrpura típico de escenario Flash FNF
-            const distPurple = Math.sqrt((r - 120) ** 2 + (g - 40) ** 2 + (b - 160) ** 2);
-            const isPurpleStage = (r > 60 && b > 80 && g < Math.max(r, b) * 0.75);
+            // Distancia a morado/magenta típico de escenario FNF / Flash (#7A2B9E / #6D1F88 / #260a3a)
+            const distPurple = Math.sqrt((r - 122) ** 2 + (g - 43) ** 2 + (b - 158) ** 2);
+            const distPurpleDark = Math.sqrt((r - 38) ** 2 + (g - 10) ** 2 + (b - 58) ** 2);
+            const isPurpleTone = (r > 30 && b > 50 && g < Math.max(r, b) * 0.78);
+            const isWhiteOrGrey = (r > 160 && g > 160 && b > 160 && Math.abs(r - g) < 30 && Math.abs(g - b) < 30);
 
             let isResidue = false;
-            if (a <= alphaThreshold) {
+            if (a <= hardAlphaCutoff) {
                 isResidue = true;
-            } else if (a <= 50 && (distBg <= chromaTolerance || distWhite <= 70 || distPurple <= 75 || isPurpleStage)) {
+            } else if (a <= stageAlphaCutoff && (distBg <= chromaTolerance || distWhite <= 95 || distPurple <= 110 || distPurpleDark <= 85 || isPurpleTone || isWhiteOrGrey)) {
                 isResidue = true;
-            } else if (mode === 'advanced' && a <= 75 && (distBg <= chromaTolerance * 1.25 || distWhite <= 85 || distPurple <= 90 || isPurpleStage)) {
+            } else if (mode === 'advanced' && a <= 200 && (distWhite <= 85 || distPurple <= 95 || isPurpleTone || (distBg <= chromaTolerance && sampleCount > 10))) {
                 isResidue = true;
             }
 
@@ -327,63 +349,73 @@
                 data[i + 3] = 0;
                 isOpaque[p] = 0;
             } else {
-                isOpaque[p] = 1;
-                rCopy[p] = r;
-                gCopy[p] = g;
-                bCopy[p] = b;
+                // Solo marcar como opaco si es un píxel con opacidad sólida real
+                if (a >= 210) {
+                    isOpaque[p] = 1;
+                    rCopy[p] = r;
+                    gCopy[p] = g;
+                    bCopy[p] = b;
+                } else {
+                    isOpaque[p] = 0; // Píxel semi-transparente de borde (se de-fringeará y no contaminará el sangrado)
+                }
             }
         }
 
-        // 4. De-fringing: desintoxicar bordes semi-transparentes
-        if (mode !== 'normal') {
-            for (let y = 0; y < height; y++) {
-                const row = y * width;
-                for (let x = 0; x < width; x++) {
-                    const p = row + x;
-                    const p4 = p * 4;
-                    const a = data[p4 + 3];
-                    if (a > 0 && a < 180) {
-                        const distBg = Math.sqrt((data[p4] - bgR) ** 2 + (data[p4 + 1] - bgG) ** 2 + (data[p4 + 2] - bgB) ** 2);
-                        const distWhite = Math.sqrt((data[p4] - 255) ** 2 + (data[p4 + 1] - 255) ** 2 + (data[p4 + 2] - 255) ** 2);
-                        if (distBg < 70 || distWhite < 60) {
-                            let bestR = data[p4], bestG = data[p4 + 1], bestB = data[p4 + 2], found = false;
-                            for (let dy = -2; dy <= 2 && !found; dy++) {
-                                const ny = y + dy;
-                                if (ny < 0 || ny >= height) continue;
-                                const nRow = ny * width;
-                                for (let dx = -2; dx <= 2 && !found; dx++) {
-                                    const nx = x + dx;
-                                    if (nx < 0 || nx >= width) continue;
-                                    const np4 = (nRow + nx) * 4;
-                                    if (data[np4 + 3] > 220) {
-                                        bestR = data[np4];
-                                        bestG = data[np4 + 1];
-                                        bestB = data[np4 + 2];
-                                        found = true;
-                                    }
-                                }
-                            }
-                            if (found) {
-                                data[p4] = bestR;
-                                data[p4 + 1] = bestG;
-                                data[p4 + 2] = bestB;
-                                rCopy[p] = bestR;
-                                gCopy[p] = bestG;
-                                bCopy[p] = bestB;
+        // 4. De-fringing Profundo: reemplazar cualquier tono residual en bordes semi-transparentes
+        // con el color sólido del personaje (evita 100% que los bordes semi-transparentes tengan morado o blanco)
+        for (let y = 0; y < height; y++) {
+            const row = y * width;
+            for (let x = 0; x < width; x++) {
+                const p = row + x;
+                const p4 = p * 4;
+                const a = data[p4 + 3];
+                if (a > 0 && a < 210) {
+                    let bestR = data[p4], bestG = data[p4 + 1], bestB = data[p4 + 2], found = false;
+                    const searchRadius = (mode === 'advanced') ? 5 : 4;
+
+                    for (let dy = -searchRadius; dy <= searchRadius && !found; dy++) {
+                        const ny = y + dy;
+                        if (ny < 0 || ny >= height) continue;
+                        const nRow = ny * width;
+                        for (let dx = -searchRadius; dx <= searchRadius && !found; dx++) {
+                            const nx = x + dx;
+                            if (nx < 0 || nx >= width) continue;
+                            const np = nRow + nx;
+                            if (isOpaque[np] === 1) {
+                                bestR = rCopy[np];
+                                bestG = gCopy[np];
+                                bestB = bCopy[np];
+                                found = true;
                             }
                         }
+                    }
+
+                    if (found) {
+                        data[p4] = bestR;
+                        data[p4 + 1] = bestG;
+                        data[p4 + 2] = bestB;
+                        rCopy[p] = bestR;
+                        gCopy[p] = bestG;
+                        bCopy[p] = bestB;
+                    } else if (a < 200) {
+                        // Si es un píxel aislado semi-transparente sin color sólido de personaje cercano, es residuo de escenario
+                        data[p4] = 0;
+                        data[p4 + 1] = 0;
+                        data[p4 + 2] = 0;
+                        data[p4 + 3] = 0;
                     }
                 }
             }
         }
 
         // 5. Sangrado de color activo (Alpha Dilation BFS)
+        // Extiende ÚNICAMENTE colores limpios de personajes hacia los píxeles transparentes adyacentes
         let frontier = [];
         for (let y = 0; y < height; y++) {
             const row = y * width;
             for (let x = 0; x < width; x++) {
                 const p = row + x;
-                if (isOpaque[p] === 0) {
+                if (data[p * 4 + 3] === 0) {
                     if ((x > 0 && isOpaque[p - 1] === 1) ||
                         (x < width - 1 && isOpaque[p + 1] === 1) ||
                         (y > 0 && isOpaque[p - width] === 1) ||
@@ -436,6 +468,8 @@
                     data[p4] = newR;
                     data[p4 + 1] = newG;
                     data[p4 + 2] = newB;
+                    // Mantener alpha en 0 (completamente transparente pero con color del personaje para ASTC)
+                    data[p4 + 3] = 0;
 
                     dilatedPixels[p] = 1;
                 }
@@ -459,7 +493,7 @@
 
                     for (let n = 0; n < neighbors.length; n++) {
                         const np = neighbors[n];
-                        if (isOpaque[np] === 0) {
+                        if (isOpaque[np] === 0 && data[np * 4 + 3] === 0) {
                             isOpaque[np] = 2;
                             nextFrontier.push(np);
                         }
@@ -473,7 +507,7 @@
             }
         }
 
-        // 6. Fondo distante a (0, 0, 0, 0) para bloques constantes en ASTC
+        // 6. Fondo distante a (0, 0, 0, 0) absoluto para bloques constantes en ASTC
         for (let i = 0, p = 0; i < data.length; i += 4, p++) {
             if (data[i + 3] === 0 && dilatedPixels[p] === 0) {
                 data[i] = 0;
@@ -490,7 +524,16 @@
      * Auditoría de Textura ASTC decodificada:
      * Inspecciona los píxeles decodificados para comprobar si quedaron residuos o halos.
      */
-    function auditTexture(canvas, xmlFrames) {
+    function auditTexture(canvasOrObj, xmlFrames) {
+        const canvas = (canvasOrObj && canvasOrObj.canvas) ? canvasOrObj.canvas : canvasOrObj;
+        if (!canvas || typeof canvas.getContext !== 'function') {
+            return {
+                hasFlaws: false,
+                residualCount: 0,
+                suspiciousHalos: 0,
+                totalEvaluated: 0
+            };
+        }
         const width = canvas.width;
         const height = canvas.height;
         const ctx = canvas.getContext('2d');
