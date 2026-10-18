@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spritesheet Generator FNF'</title>
+
+    <link rel="stylesheet" href="css/themes.css">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/windows.css">
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#020308">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="SpriteGen FNF">
+    <link rel="apple-touch-icon" href="logo-192.png">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/upng-js@2.1.0/UPNG.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
+</head>
+
+<body>
+
+    <!-- SISTEMA -->
+    <div id="globalLoader" class="global-loader">
+        <div class="loader-content">
+            <div class="ia-spinner"></div>
+            <p id="globalLoaderText"
+                style="color: white; font-weight: bold; margin-top: 15px; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
+                Iniciando...</p>
+        </div>
+    </div>
+
+    <div class="glass-bg">
+        <div class="glass-blob blob-1"></div>
+        <div class="glass-blob blob-2"></div>
+        <div class="glass-blob blob-3"></div>
+        <div class="glass-blob blob-4"></div>
+    </div>
+
+    <div class="drag-overlay" id="dragOverlay">
+        <div class="drag-overlay-content">
+            <img src="https://cdn-icons-png.flaticon.com/512/716/716784.png"
+                style="width: 80px; filter: brightness(0) invert(1); margin-bottom: 20px;"><br>
+            SUELTA EL ARCHIVO AQUÍ
+        </div>
+    </div>
+    <div class="app-header">
+        <h1 class="app-title" onclick="location.reload()" style="cursor:pointer;" title="Recargar página">
+            <img src="logo-192.png" class="icon logo-icon" alt="Logo">
+            Spritesheet Generator FNF'
+        </h1>
+
+        <div class="window-nav">
+            <button class="win-btn active" onclick="window.location.href='index.html'" id="navHome"><img
+                    src="https://cdn-icons-png.flaticon.com/128/4675/4675164.png" class="icon" alt="Inicio">
+                Inicio</button>
+            <button class="win-btn" onclick="openWindow('win-escaner')" id="navEscaner" style="display:none;"><img
+                    src="https://cdn-icons-png.flaticon.com/128/10301/10301595.png" class="icon" alt="Escaner">
+                Escáner</button>
+            <button class="win-btn" onclick="openWindow('win-orden')" id="navOrden" style="display:none;"><img
+                    src="https://cdn-icons-png.flaticon.com/512/151/151210.png" class="icon" alt="Secuenciador">
+                Secuenciador</button>
+            <button class="win-btn" onclick="openWindow('win-afinador')" id="navAfinador" style="display:none;"><img
+                    src="https://cdn-icons-png.flaticon.com/512/126/126472.png" class="icon" alt="Afinador">
+                Afinador</button>
+            <button class="win-btn psych-mode" onclick="openWindow('win-psych')" id="navPsych"
+                style="display:none;"><img src="https://cdn-icons-png.flaticon.com/512/3135/3135692.png" class="icon"
+                    alt="Psych"> Psych Live</button>
+
+            <button class="win-btn" onclick="openWindow('win-compresor')" id="navCompresor" style="display:none;"><img
+                    src="https://cdn-icons-png.flaticon.com/512/8208/8208316.png" class="icon" alt="Comprimir">
+                Compresor PNG</button>
+            <button class="win-btn" onclick="openWindow('win-audio')" id="navAudio"
+                style="display:none; color: #ffaa00; border-color: #ffaa00;"><img
+                    src="https://cdn-icons-png.flaticon.com/512/862/862700.png" class="icon"
+                    style="filter: brightness(0) saturate(100%) invert(67%) sepia(98%) saturate(1906%) hue-rotate(359deg) brightness(101%) contrast(105%);"
+                    alt="Audio"> Compresor OGG</button>
+            <button class="win-btn" onclick="openWindow('win-atlas')" id="navAtlas"
+                style="display:none; color: #ff3366; border-color: #ff3366;"><img
+                    src="https://cdn-icons-png.flaticon.com/512/8243/8243003.png" class="icon"
+                    style="filter: brightness(0) saturate(100%) invert(32%) sepia(97%) saturate(2250%) hue-rotate(327deg) brightness(101%) contrast(106%);"
+                    alt="Atlas"> Conversor Atlas</button>
+
+            <button class="win-btn btn-pack" onclick="repackAndExport()" id="navPack" style="display:none;"
+                title="Desduplica y Empaqueta en ZIP."><img
+                    src="https://cdn-icons-png.flaticon.com/512/1159/1159330.png" class="icon" alt="Pack"> Descargar
+                ZIP</button>
+            <button class="win-btn btn-export" onclick="exportarActual()" id="navExport" style="display:none;"><img
+                    src="https://cdn-icons-png.flaticon.com/512/2874/2874091.png" class="icon" id="iconExport"
+                    alt="Export"> Solo Guardar XML</button>
+        </div>
+    </div>
+
+    <div class="main-workspace">
+
+        <div id="win-home" class="window-content active">
+            <h2 class="section-title" style="text-align: center; border:none; color: white; justify-content: center;">
+                ENTORNO DE DESARROLLO</h2>
+
+            <div class="home-grid">
+                <div class="home-card" onclick="window.location.href='escaner.html'">
+                    <img src="https://cdn-icons-png.flaticon.com/128/1913/1913663.png" class="icon-lg" alt="Escaneo">
+                    <h3 class="home-title">Escaneo de Cero</h3>
+                    <p class="home-desc">Esta opcion funciona importando una imagen con formato .png para escanearlo y
+                        generar un archivo xml para el personaje.</p>
+                    <div class="btn-pildora btn-secundario" style="width: 100%;">Entrar</div>
+                </div>
+
+                <div class="home-card" onclick="window.location.href='optimizador.html'">
+                    <img src="https://cdn-icons-png.flaticon.com/128/7100/7100753.png" class="icon-lg"
+                        alt="Optimizador">
+                    <h3 class="home-title">Optimizador</h3>
+                    <p class="home-desc">Esta opcion funciona subiendo un XML+PNG para modificar o corregir sprites del
+                        personaje o simplemente edita y exporta el XML sin tocar el PNG.</p>
+                    <div class="btn-pildora btn-secundario" style="width: 100%; border-color:#ffcc00; color:#ffcc00;">
+                        Entrar</div>
+                </div>
+
+                <div class="home-card psych" onclick="window.location.href='psych.html'">
+                    <img src="https://cdn-icons-png.flaticon.com/512/3135/3135692.png" class="icon-lg"
+                        style="filter: brightness(0) saturate(100%) invert(86%) sepia(85%) saturate(1637%) hue-rotate(34deg) brightness(108%) contrast(106%) drop-shadow(0 0 10px rgba(170,255,0,0.4));"
+                        alt="Psych">
+                    <h3 class="home-title" style="color:var(--accent-psych);">Psych Character Builder (BETA)</h3>
+                    <p class="home-desc">Esta opcion sirve para visualizar y alinear animaciones en vivo para generar
+                        archivos .json sin necesidad de entrar al Character Editor de Psych Engine.</p>
+                    <p>POR EL MOMENTO ESTA OPTION PUEDE NO ESTAR FUNCIONANDO DE MANERA ADECUADA </p>
+                    <div class="btn-pildora btn-secundario"
+                        style="width: 100%; border-color:var(--accent-psych); color:var(--accent-psych);">
+                        Entrar</div>
+                </div>
+
+                <div class="home-card" onclick="window.location.href='compresor.html'">
+                    <img src="https://cdn-icons-png.flaticon.com/512/8208/8208316.png" class="icon-lg"
+                        style="filter: brightness(0) saturate(100%) invert(58%) sepia(56%) saturate(4171%) hue-rotate(244deg) brightness(102%) contrast(101%);"
+                        alt="Comprimir">
+                    <h3 class="home-title" style="color: #b57cff;">Compresor PNG</h3>
+                    <p class="home-desc">Esta opcion funciona importando una imagen .PNG para recudir su tamaño (MB),
+                        manteniendo la misma calidad de pixeles de la imagen. (Ideal para tener mas almacenamiento)</p>
+                    <div class="btn-pildora btn-secundario" style="width: 100%; border-color:#b57cff; color:#b57cff;">
+                        Entrar</div>
+                </div>
+
+                <div class="home-card" onclick="window.location.href='audio.html'">
+                    <img src="https://cdn-icons-png.flaticon.com/512/862/862700.png" class="icon-lg"
+                        style="filter: brightness(0) saturate(100%) invert(67%) sepia(98%) saturate(1906%) hue-rotate(359deg) brightness(101%) contrast(105%) drop-shadow(0 0 10px rgba(255,170,0,0.4));"
+                        alt="Audio">
+                    <h3 class="home-title" style="color: #ffaa00;">Compresor OGG (BETA)</h3>
+                    <p class="home-desc">Esta opción reduce el peso de tus Instrumentales y Voces (.OGG) eligiendo el
+                        equilibrio perfecto entre peso y calidad de sonido. (POR EL MOMENTO NO FUNCIONA CORRECTAMENTE).
+                    </p>
+                    <div class="btn-pildora btn-secundario" style="width: 100%; border-color:#ffaa00; color:#ffaa00;">
+                        Entrar</div>
+                </div>
+
+                <div class="home-card" onclick="window.location.href='atlas.html'">
+                    <img src="https://cdn-icons-png.flaticon.com/512/8243/8243003.png" class="icon-lg"
+                        style="filter: brightness(0) saturate(100%) invert(32%) sepia(97%) saturate(2250%) hue-rotate(327deg) brightness(101%) contrast(106%) drop-shadow(0 0 10px rgba(255,51,102,0.4));"
+                        alt="Atlas">
+                    <h3 class="home-title" style="color: #ff3366;">Conversor Animate Atlas (BETA)</h3>
+                    <p class="home-desc">Convierte Texture Atlas exportados desde Adobe Animate (spritemap.json) directo
+                        al formato Sparrow XML nativo de FNF.</p>
+                    <div class="btn-pildora btn-secundario" style="width: 100%; border-color:#ff3366; color:#ff3366;">
+                        Entrar</div>
+                </div>
+
+                <div class="home-card" onclick="window.location.href='generador_gif.html'">
+                    <img src="https://cdn-icons-png.flaticon.com/512/1210/1210214.png" class="icon-lg"
+                        style="filter: brightness(0) saturate(100%) invert(73%) sepia(50%) saturate(543%) hue-rotate(170deg) brightness(103%) contrast(101%) drop-shadow(0 0 10px rgba(0,229,255,0.4));"
+                        alt="GIF">
+                    <h3 class="home-title" style="color: var(--accent);">Generador GIF Animado</h3>
+                    <p class="home-desc">Esta opcion funciona subiendo imagenes sueltas, subiendo una PNG ya con los
+                        sprites
+                        o subiendo el XML + el PNG para generar un GIF Animado siguiendo el BPM de la cancion deseada.
+                    </p>
+                    <div class="btn-pildora btn-secundario"
+                        style="width: 100%; border-color:var(--accent); color:var(--accent);">
+                        Entrar</div>
+                </div>
+
+                <div class="home-card" onclick="window.location.href='astc.html'">
+                    <img src="https://cdn-icons-png.flaticon.com/128/3114/3114883.png" class="icon-lg"
+                        style="filter: brightness(0) saturate(100%) invert(80%) sepia(40%) saturate(600%) hue-rotate(90deg) brightness(102%) contrast(102%) drop-shadow(0 0 10px rgba(0,255,136,0.4));"
+                        alt="ASTC">
+                    <h3 class="home-title" style="color: #00ff88;">Estudio ASTC (Móviles / Android)</h3>
+                    <p class="home-desc">Suite completa con 4 herramientas para texturas .ASTC: Secuenciador y optimizador ASTC + XML, conversor de ASTC a PNG, conversor de PNG a ASTC y compresor de peso para archivos ASTC.</p>
+                    <div class="btn-pildora btn-secundario" style="width: 100%; border-color:#00ff88; color:#00ff88;">
+                        Entrar</div>
+                </div>
+            </div>
+
+            <div class="home-footer"
+                style="display:flex; flex-direction:column; gap:10px; align-items:center; opacity:0.8; margin-top:40px; padding:20px; border-top:1px solid rgba(255,255,255,0.1);">
+                <button class="btn-pildora btn-secundario"
+                    style="font-size: 0.8rem; padding: 5px 15px; border-color: transparent; opacity: 0.8;"
+                    onclick="document.getElementById('privacyModal').style.display='flex'">
+                    <img src="https://cdn-icons-png.flaticon.com/128/9703/9703632.png"
+                        style="width:16px; filter:invert(1); vertical-align:middle; margin-right:5px;"> Política de
+                    Privacidad
+                </button>
+                <div style="font-weight:bold; color:var(--accent); font-size: 0.9rem;">
+                    &copy; LaloCF 2026 | Versión 1.6.0
+
+                </div>
+            </div>
+        </div>
+
+        <div class="overlay-modal" id="welcomeModal" style="display: none;">
+            <div class="modal-box">
+                <h2 class="modal-title">¡Bienvenido a Spritesheet Generator FNF!</h2>
+                <div class="modal-body">
+                    <p>La herramienta definitiva creada en la web para optimizar y crear spritesheets listos para
+                        <b>Friday
+                            Night Funkin'</b>. Esto es lo que puedes hacer aquí:
+                    </p>
+
+                    <ul class="modal-list">
+                        <li><img src="https://cdn-icons-png.flaticon.com/128/10301/10301595.png" class="icon-sm">
+                            <b>Escanear de Cero:</b> Sube un PNG en la web y fusionará, recortará las cajas de tus
+                            dibujos
+                            automáticamente sin dejar fragmentos sin usar.
+                        </li>
+                        <li><img src="https://cdn-icons-png.flaticon.com/512/1041/1041985.png" class="icon-sm">
+                            <b>Optimizador:</b> Sube tu XML y tu PNG. El sistema se encargará de darte una imagen más
+                            optimizada con su XML modificado.
+                        </li>
+                        <li><img src="https://cdn-icons-png.flaticon.com/512/126/126472.png" class="icon-sm">
+                            <b>Laboratorio
+                                de Offsets:</b> Ajusta posiciones, escala, duplica frames, renombra en masa y visualiza
+                            cómo
+                            lucirá cada animación.
+                        </li>
+                        <li><img src="https://cdn-icons-png.flaticon.com/512/3135/3135692.png" class="icon-sm"> <b>Psych
+                                Live Editor:</b> Crea el archivo JSON de tu personaje alineando posiciones, barra de
+                            vida y
+                            la cámara en tiempo real.</li>
+                        <li><img src="https://cdn-icons-png.flaticon.com/512/8208/8208316.png" class="icon-sm"> <b
+                                style="color:#b57cff;">Compresor PNG Pro:</b> Sube tu imagen PNG y la herramienta bajará
+                            su
+                            peso drásticamente conservando su resolución.</li>
+                        <li><img src="https://cdn-icons-png.flaticon.com/512/862/862700.png" class="icon-sm"> <b
+                                style="color:#ffaa00;">Compresor Audio OGG:</b> Reduce el tamaño de tus voces e
+                            instrumentales en segundos.</li>
+                        <li><img src="https://cdn-icons-png.flaticon.com/512/8243/8243003.png" class="icon-sm"> <b
+                                style="color:#ffaa00;">Conversor Animate Atlas:</b> Convierte Texture Atlas exportados
+                            desde
+                            Adobe Animate (spritemap.json) directo al formato Sparrow XML nativo de FNF u optimizando
+                            la resolucion de la imagen .png.</li>
+                        <li><img src="https://cdn-icons-png.flaticon.com/512/1210/1210214.png" class="icon-sm"> <b
+                                style="color:var(--accent);">Generador GIF Animado:</b> Crea GIFs animados a partir de
+                            archivos sueltos,
+                            spritesheets solos, o combinaciones de XML+PNG sincronizados a los BPM de Friday Night
+                            Funkin'.</li>
+                    </ul>
+                </div>
+                <button class="btn-pildora btn-modal-action" onclick="closeWelcomeModal()">¡Comenzar a Crear!</button>
+            </div>
+        </div>
+
+        <div class="overlay-modal" id="privacyModal" style="display: none; z-index: 10002;">
+            <div class="modal-box" style="max-width: 600px;">
+                <h2 class="modal-title" style="color: var(--accent);"><img
+                        src="https://cdn-icons-png.flaticon.com/128/9703/9703632.png"
+                        style="width:30px; filter:invert(1);"> Política de Privacidad</h2>
+                <div class="modal-body" style="font-size: 0.95rem; line-height: 1.6;">
+                    <p>En <b>Spritesheet Generator FNF'</b> tomamos muy en serio tu privacidad y la seguridad de tus
+                        proyectos artísticos.</p>
+                    <ul class="modal-list" style="margin-top: 15px;">
+                        <li><b style="color: #00e5ff;">Procesamiento Local:</b> Absolutamente todos los archivos que
+                            importas (imágenes PNG, documentos XML, archivos de audio OGG o datos JSON) son procesados
+                            directamente en la memoria RAM de tu navegador web.</li>
+                        <li><b style="color: #ff3366;">Sin Servidores:</b> Esta herramienta no cuenta con una base de
+                            datos centralizada, por lo tanto, ningún archivo, sprite o información personal es enviada,
+                            subida, o guardada en servidores externos o en la nube.</li>
+                        <li><b style="color: #ffaa00;">Tus Derechos:</b> Tus creaciones, mods y arte original te
+                            pertenecen al 100%. Nosotros no retenemos copias de lo que generas en la plataforma.</li>
+                        <li><b style="color: #b57cff;">Seguridad Efímera:</b> En el momento en que recargas la página o
+                            cierras la pestaña de tu navegador, toda la información importada y modificada es eliminada
+                            de manera permanente de la memoria temporal.</li>
+                    </ul>
+                    <p style="margin-top: 15px; color: #aaa; text-align: center; font-size: 0.8rem;">Al utilizar
+                        nuestras herramientas, tienes la total seguridad de que tu trabajo está completamente protegido
+                        del escrutinio público.</p>
+                </div>
+                <button class="btn-pildora btn-modal-action"
+                    style="background: var(--accent); border-color: var(--accent); color: #000;"
+                    onclick="document.getElementById('privacyModal').style.display='none'">¡Entendido!</button>
+            </div>
+        </div>
+
+        <div class="overlay-modal" id="changelogModal" style="display: none;">
+            <div class="modal-box modal-box-changelog">
+                <h2 class="modal-title" style="color: var(--accent-gold);">¡Novedades en la Versión 1.4! ✨</h2>
+                <div class="modal-body">
+                    <p>El proyecto se ha actualizado. Aquí tienes los últimos cambios implementados v1.4:</p>
+                    <ul class="modal-list">
+                        <li><b><span style="color: #ffaa00;">[NUEVO]</span> Conversor Animate Atlas:</b> Puedes importar
+                            los
+                            archivos .json y su imagen .png para optimizarla y reducir su resolucion de imagen.
+                        </li>
+                        <li><b><span style="color: #b57cff;">[NUEVO]</span> Optimizador:</b> Ahora no nomas puedes
+                            editar y
+                            modificar la escala del personaje, ahora puedes modificar y optimizar la resolucion de la
+                            imagen .png
+                            manteniendo un peso drasticamente reducido.</li>
+                    </ul>
+                </div>
+                <button class="btn-pildora btn-modal-action"
+                    style="background: linear-gradient(135deg, #b38f00, #665200); border-color: var(--accent-gold);"
+                    onclick="closeChangelogModal()">¡Entendido!</button>
+            </div>
+        </div>
+
+        <!-- HISTORIAL -->
+        <div class="overlay-modal" id="historyModal" style="display:none;">
+            <div class="modal-box">
+                <h2 class="modal-title"><img src="https://cdn-icons-png.flaticon.com/128/2088/2088617.png"
+                        style="width:30px; filter:brightness(0) invert(1);"> Sesión Anterior</h2>
+                <div class="modal-body" id="historyModalContent">
+                </div>
+                <button class="btn-pildora btn-secundario" style="width:100%; margin-top:20px;"
+                    onclick="closeHistoryModal()">Cancelar</button>
+            </div>
+        </div>
+
+        <!-- MODAL -->
+        <div class="overlay-modal" id="modalJsonWarning" style="display:none; z-index: 10001;">
+            <div class="modal-box ia-box" style="max-width: 450px; text-align:center;">
+                <div class="modal-header">
+                    <h2><img src="https://cdn-icons-png.flaticon.com/128/1828/1828843.png" class="icon-lg"
+                            style="margin-bottom:0;" alt="Warning"> Advertencia</h2>
+                </div>
+                <div class="modal-body" style="color:var(--text);">
+                    <p>Se ha reducido el tamaño de la imagen, pero <b>no importaste ningún archivo .JSON</b> para
+                        corregir las coordenadas.</p>
+                    <p>Si exportas ahora, la imagen y el XML estarán bien, pero las animaciones dentro del juego podrían
+                        verse desalineadas (offset incorrecto).</p>
+                    <p style="margin-top:20px; font-weight:bold;">¿Deseas continuar la exportación sin el JSON?</p>
+                </div>
+                <div class="modal-footer" style="display:flex; gap:10px; justify-content:center; margin-top:20px;">
+                    <button class="btn-pildora btn-secundario" style="flex:1;"
+                        onclick="resolverModalJsonWarning(false)">Regresar</button>
+                    <button class="btn-pildora btn-export" style="flex:1;" onclick="resolverModalJsonWarning(true)">Sí,
+                        continuar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODO OSCURO -->
+        <div class="fab-wrap-dark">
+            <button class="fab-btn darkmode-btn" onclick="toggleDarkMode()" title="Modo Oscuro/Claro">
+                <img src="https://cdn-icons-png.flaticon.com/128/11885/11885172.png" id="darkModeIcon"
+                    class="icon-sm icon-black" alt="Dark Mode">
+            </button>
+        </div>
+
+        <!-- HISTORIAL -->
+        <div class="fab-wrap-history">
+            <button class="fab-btn history-btn" onclick="showHistoryModal()" title="Historial / Autoguardado"
+                style="background: rgba(255,170,0,0.6);">
+                <img src="https://cdn-icons-png.flaticon.com/128/2088/2088617.png" class="icon-sm icon-black"
+                    alt="History">
+            </button>
+        </div>
+
+        <!-- TEMA -->
+        <div class="fab-wrap-theme">
+            <button class="fab-btn theme-btn" onclick="toggleThemeMenu()" title="Cambiar Tema">
+                <img src="https://cdn-icons-png.flaticon.com/128/893/893322.png" class="icon-sm icon-black" alt="Theme">
+            </button>
+            <div class="fab-menu" id="fabThemeMenu">
+                <button class="fab-item" onclick="changeTheme('cyberpunk'); toggleThemeMenu();">
+                    <span class="fab-color-dot" style="background: #f1a9d4;"></span> Pastel (Predeterminado)
+                </button>
+                <button class="fab-item" onclick="changeTheme('psych'); toggleThemeMenu();">
+                    <span class="fab-color-dot" style="background: #aaff00;"></span> Tema Psych
+                </button>
+                <button class="fab-item" onclick="changeTheme('bf'); toggleThemeMenu();">
+                    <span class="fab-color-dot" style="background: #31b0d1;"></span> Tema BF
+                </button>
+            </div>
+        </div>
+
+        <script src="js/history.js"></script>
+        <script src="js/main.js" defer></script>
+
+        <script>
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                    navigator.serviceWorker.register('sw.js')
+                        .then(reg => console.log('¡Web App lista y registrada!', reg.scope))
+                        .catch(err => console.error('Error al registrar Web App:', err));
+                });
+            }
+        </script>
+</body>
+
+</html>

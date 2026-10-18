@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Generador GIF FNF'</title>
+
+    <link rel="stylesheet" href="css/themes.css?v=2">
+    <link rel="stylesheet" href="css/base.css?v=2">
+    <link rel="stylesheet" href="css/layout.css?v=2">
+    <link rel="stylesheet" href="css/components.css?v=2">
+    <link rel="stylesheet" href="css/windows.css?v=2">
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1a1a2e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="SpriteGen FNF">
+    <link rel="apple-touch-icon" href="logo-192.png">
+
+    <!-- gifenc for native transparent/clean GIF encoding -->
+    <script src="js/gifenc.js?v=2"></script>
+    <!-- gifshot for synchronous GIF encoding -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gifshot/0.3.2/gifshot.min.js"></script>
+
+    <style>
+        .gif-mode-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .gif-mode-card:hover {
+            transform: translateY(-5px);
+            background: rgba(255, 255, 255, 0.08);
+            border-color: var(--accent);
+            box-shadow: 0 5px 15px rgba(0, 229, 255, 0.2);
+        }
+
+        .gif-mode-card.selected {
+            border-color: var(--accent);
+            background: rgba(0, 229, 255, 0.1);
+            box-shadow: 0 0 20px rgba(0, 229, 255, 0.4);
+        }
+
+        .gif-mode-icon {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            display: block;
+        }
+        
+        .gif-mode-icon img {
+            width: 64px;
+            filter: brightness(0) invert(1);
+        }
+
+        .gif-mode-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: white;
+            margin-bottom: 5px;
+        }
+
+        .gif-mode-desc {
+            font-size: 0.8rem;
+            color: #aaa;
+        }
+
+        .gif-modes-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        #gifWorkspace {
+            display: none;
+            flex-direction: column;
+            gap: 20px;
+            margin-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding-top: 20px;
+        }
+
+        .preview-box {
+            background: repeating-conic-gradient(#808080 0% 25%, transparent 0% 50%) 50% / 20px 20px;
+            background-color: #a0a0a0;
+            border: 2px dashed rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            min-height: 250px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        #previewGifImg {
+            max-width: 100%;
+            max-height: 400px;
+            object-fit: contain;
+        }
+
+        .bpm-slider-container {
+            background: rgba(18, 19, 32, 0.85);
+            border: 1px solid rgba(0, 229, 255, 0.25);
+            padding: 16px;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            backdrop-filter: blur(10px);
+        }
+
+        .slider-label {
+            flex-shrink: 0;
+            color: #fff;
+            font-weight: bold;
+            font-size: 0.95rem;
+        }
+
+        input[type=range] {
+            flex-grow: 1;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+
+        .btn-step-bpm {
+            width: 34px;
+            height: 34px;
+            background: rgba(255, 255, 255, 0.08);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            user-select: none;
+        }
+
+        .btn-step-bpm:hover {
+            background: var(--accent);
+            color: #0c0d14;
+            border-color: var(--accent);
+            transform: scale(1.05);
+        }
+
+        .btn-rhythm {
+            background: rgba(255, 255, 255, 0.06);
+            color: #bbb;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 20px;
+            padding: 6px 14px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .btn-rhythm:hover {
+            background: rgba(0, 229, 255, 0.15);
+            color: #fff;
+            border-color: var(--accent);
+        }
+
+        .btn-rhythm.active {
+            background: var(--accent);
+            color: #0c0d14;
+            border-color: var(--accent);
+            font-weight: bold;
+            box-shadow: 0 0 12px rgba(0, 229, 255, 0.45);
+        }
+
+        .beat-pulse-active {
+            background-color: var(--accent) !important;
+            border-color: #fff !important;
+            box-shadow: 0 0 14px var(--accent), 0 0 25px var(--accent) !important;
+            transform: scale(1.35) !important;
+        }
+
+        .gif-bg-selector-container {
+            background: rgba(18, 19, 32, 0.85);
+            border: 1px solid rgba(0, 229, 255, 0.25);
+            padding: 16px;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            backdrop-filter: blur(10px);
+        }
+
+        .btn-color-swatch {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+            outline: none;
+            padding: 0;
+            display: inline-block;
+        }
+
+        .btn-color-swatch:hover {
+            transform: scale(1.2);
+            border-color: #fff;
+            box-shadow: 0 0 10px rgba(255,255,255,0.6);
+        }
+
+        .btn-color-swatch.active {
+            transform: scale(1.25);
+            border: 3px solid #fff !important;
+            box-shadow: 0 0 14px var(--accent), 0 0 20px var(--accent) !important;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="globalLoader" class="global-loader">
+        <div class="loader-content">
+            <div class="ia-spinner"></div>
+            <p id="globalLoaderText"
+                style="color: white; font-weight: bold; margin-top: 15px; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
+                Iniciando...</p>
+        </div>
+    </div>
+
+    <div class="glass-bg">
+        <div class="glass-blob blob-1"></div>
+        <div class="glass-blob blob-2"></div>
+        <div class="glass-blob blob-3"></div>
+        <div class="glass-blob blob-4"></div>
+    </div>
+
+    <div class="app-header">
+        <h1 class="app-title" onclick="location.reload()" style="cursor:pointer;" title="Recargar página">
+            <img src="logo-192.png" class="icon logo-icon" alt="Logo">
+            Spritesheet Generator FNF'
+        </h1>
+
+        <div class="window-nav">
+            <button class="win-btn" onclick="window.location.href='index.html'"><img
+                    src="https://cdn-icons-png.flaticon.com/128/4675/4675164.png" class="icon" alt="Inicio">
+                Inicio</button>
+            <button class="win-btn active"><img
+                    src="https://cdn-icons-png.flaticon.com/512/1210/1210214.png" class="icon" alt="GIF">
+                Generador GIF</button>
+        </div>
+    </div>
+
+    <div class="main-container" style="overflow-y: auto; max-height: calc(100vh - 80px); padding-bottom: 100px;">
+        <div class="tool-window shadow-pop" style="animation-delay: 0.1s; max-width: 900px; margin: 0 auto; display:block;">
+            <div class="window-header">
+                <div class="window-title">
+                    <img src="https://cdn-icons-png.flaticon.com/512/1210/1210214.png" class="icon" alt="GIF" style="filter:invert(1)"> Generador de GIF Animado
+                </div>
+            </div>
+            
+            <div class="window-content" id="win-gif">
+
+                
+                <p style="color: #aaa; margin-bottom: 20px; font-size:0.9rem;">Sube tu hoja de sprites (.PNG) y tu archivo .XML asociado para extraer la animación.</p>
+
+                <div id="fileInputsContainer" style="display:flex; flex-direction:column; gap:15px; margin-bottom: 20px;">
+                    <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                        <input type="file" id="gifXmlUpload" class="hidden-file" accept="*/*" style="display:none;">
+                        <button class="btn-pildora" style="flex:1 1 240px; padding: clamp(12px, 3vw, 18px); font-size: clamp(0.95rem, 2.5vw, 1.1rem); background: #b57cff; color: #000; border:none; display:flex; align-items:center; justify-content:center; gap:10px; box-shadow: 0 4px 15px rgba(181, 124, 255, 0.4); box-sizing: border-box;" onclick="document.getElementById('gifXmlUpload').click();">
+                            <img src="https://cdn-icons-png.flaticon.com/128/136/136443.png" class="icon icon-black" alt="Upload"> 
+                            <div>
+                                <b>CARGAR ARCHIVO XML</b><br>
+                                <span style="font-size:0.8rem; opacity:0.8;">Contiene las coordenadas y nombres</span>
+                            </div>
+                        </button>
+
+                        <input type="file" id="gifPngUpload" class="hidden-file" accept="*/*" style="display:none;">
+                        <button class="btn-pildora" style="flex:1 1 240px; padding: clamp(12px, 3vw, 18px); font-size: clamp(0.95rem, 2.5vw, 1.1rem); background: #ffaa00; color: #000; border:none; display:flex; align-items:center; justify-content:center; gap:10px; box-shadow: 0 4px 15px rgba(255, 170, 0, 0.4); box-sizing: border-box;" onclick="document.getElementById('gifPngUpload').click();">
+                            <img src="https://cdn-icons-png.flaticon.com/512/716/716784.png" class="icon icon-black" alt="Upload"> 
+                            <div>
+                                <b>CARGAR IMAGEN PNG</b><br>
+                                <span style="font-size:0.8rem; opacity:0.8;">Soporta navegación sin límite (Android)</span>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="gifWorkspace">
+                    
+                    <div id="xmlAnimSelector" style="display:none; background:rgba(0,0,0,0.4); padding:12px 14px; border-radius:10px; flex-direction:column; gap:8px;">
+                        <label style="color:#fff; font-weight:bold; font-size:0.9rem;">Seleccionar Animación del XML:</label>
+                        <select id="selectAnimacionXML" class="select-modern" style="width:100%; min-width:0; box-sizing:border-box;">
+                            <option value="">Carga un XML primero...</option>
+                        </select>
+                    </div>
+
+                    <!-- BPM / Sincronización Musical Precisa -->
+                    <div class="bpm-slider-container" id="bpmContainerGif">
+                        <!-- Cabecera: Título + Pulso LED + Audio Metrónomo -->
+                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; width:100%; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:10px;">
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <span style="font-size:1.05rem; font-weight:bold; color:var(--accent);">🎵 Sincronización de Ritmo BPM</span>
+                                <div id="beatIndicatorLed" title="Pulso del Golpe de Compás (Beat)" style="width:14px; height:14px; border-radius:50%; background:#222; border:2px solid #555; transition: transform 0.05s, box-shadow 0.05s, background-color 0.05s;"></div>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <button type="button" id="btnMetronomoAudio" class="btn-pildora btn-secundario" style="padding:4px 12px; font-size:0.8rem; height:32px;" onclick="toggleMetronomoAudio()" title="Activar/desactivar clic sonoro para verificar con tu música">
+                                    🔈 Escuchar Beat
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Fila BPM: Slider continuo + Steppers + Input Numérico Directo -->
+                        <div class="bpm-controls-row">
+                            <span class="slider-label" style="min-width:55px;">Tempo:</span>
+                            <button type="button" class="btn-step-bpm" onclick="ajustarBpmRelativo(-1)" title="Restar 1 BPM">-</button>
+                            <input type="range" id="sliderBpm" min="40" max="300" step="1" value="100" oninput="onInputSliderBpm(this.value)" style="flex:1; min-width:140px;">
+                            <button type="button" class="btn-step-bpm" onclick="ajustarBpmRelativo(+1)" title="Sumar 1 BPM">+</button>
+                            <div style="display:flex; align-items:center; gap:5px; background:rgba(0,0,0,0.4); padding:4px 8px; border-radius:6px; border:1px solid rgba(255,255,255,0.15);">
+                                <input type="number" id="inputBpmNum" min="40" max="300" step="1" value="100" oninput="onInputChangeBpmNum(this.value)" style="width:55px; background:transparent; border:none; color:var(--accent); font-weight:bold; font-size:1.05rem; text-align:center; outline:none;">
+                                <span style="color:#aaa; font-size:0.85rem; font-weight:bold;">BPM</span>
+                            </div>
+                            <span id="lblBpm" style="display:none;">100</span>
+                        </div>
+
+                        <!-- Selector de División de Ritmo Musical -->
+                        <div style="display:flex; flex-direction:column; gap:8px; width:100%; margin-top:4px; background:rgba(0,0,0,0.25); padding:10px; border-radius:8px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:5px;">
+                                <span style="font-size:0.85rem; color:#ccc; font-weight:bold;">Sincronizar ciclo completo de la animación a:</span>
+                                <span id="lblDuracionDetalle" style="font-size:0.82rem; color:var(--accent); font-weight:bold;">1 Beat = 600.0 ms</span>
+                            </div>
+                            <div class="rhythm-selector-group" id="rhythmSelectorGroup" style="display:flex; flex-wrap:wrap; gap:8px;">
+                                <button type="button" class="btn-rhythm active" data-beats="1" onclick="cambiarModoRitmo(1, this)">
+                                    ⚡ 1 Beat (FNF Standard)
+                                </button>
+                                <button type="button" class="btn-rhythm" data-beats="2" onclick="cambiarModoRitmo(2, this)">
+                                    ↔️ 2 Beats (Izq / Der)
+                                </button>
+                                <button type="button" class="btn-rhythm" data-beats="4" onclick="cambiarModoRitmo(4, this)">
+                                    🎼 4 Beats (Compás)
+                                </button>
+                                <button type="button" class="btn-rhythm" data-beats="0.5" onclick="cambiarModoRitmo(0.5, this)">
+                                    ⏩ 1/2 Beat (Rápido)
+                                </button>
+                                <button type="button" class="btn-rhythm" data-beats="step" onclick="cambiarModoRitmo('step', this)">
+                                    👟 1 Step por Frame
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Métricas de Tiempo Musical en Tiempo Real -->
+                        <div style="display:flex; justify-content:space-between; align-items:center; width:100%; font-size:0.82rem; color:#aaa; flex-wrap:wrap; gap:10px; border-top:1px solid rgba(255,255,255,0.06); padding-top:8px;">
+                            <div>⏱️ Duración ciclo: <span id="lblCicloTotalMs" style="color:#fff; font-weight:bold;">600.0 ms</span></div>
+                            <div>🎞️ Velocidad frame: <span id="lblMsPerFrame" style="color:#fff; font-weight:bold;">42.86 ms/f</span></div>
+                            <div id="lblFpsEquiv" style="color:var(--accent-pink); font-size:0.78rem;">Precisión continua musical</div>
+                            <span id="lblFps" style="display:none;">(= 24 FPS)</span>
+                        </div>
+                    </div>
+
+                    <!-- Control de Fondo del GIF (Transparente o Paleta de Color) -->
+                    <div class="gif-bg-selector-container" id="gifBgContainer">
+                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; width:100%; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:10px;">
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span style="font-size:1.05rem; font-weight:bold; color:var(--accent);">🎨 Fondo del GIF</span>
+                                <span id="badgeFondoActual" style="font-size:0.75rem; background:rgba(0, 229, 255, 0.15); border:1px solid var(--accent); color:var(--accent); padding:2px 8px; border-radius:12px; font-weight:600;">Transparente</span>
+                            </div>
+                            <div style="display:flex; gap:6px;">
+                                <button type="button" class="btn-rhythm active" id="btnBgModoTransparente" onclick="seleccionarModoFondoGif('transparent')" title="Exportar con fondo transparente">
+                                    🏁 Transparente
+                                </button>
+                                <button type="button" class="btn-rhythm" id="btnBgModoColor" onclick="seleccionarModoFondoGif('color')" title="Exportar con color de fondo">
+                                    🎨 Color Sólido
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Panel de Paleta de Colores (se activa con 'color') -->
+                        <div id="panelPaletaColoresGif" style="display:none; flex-direction:column; gap:10px; margin-top:4px; background:rgba(0,0,0,0.25); padding:12px; border-radius:8px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                                <span style="font-size:0.85rem; color:#ccc; font-weight:bold;">Paleta de colores sugeridos:</span>
+                                <div style="display:flex; align-items:center; gap:8px; background:rgba(0,0,0,0.4); padding:4px 10px; border-radius:6px; border:1px solid rgba(255,255,255,0.15);">
+                                    <span style="font-size:0.8rem; color:#aaa;">Personalizado:</span>
+                                    <input type="color" id="pickerColorFondoGif" value="#1a1a2e" oninput="cambiarColorFondoGif(this.value)" style="cursor:pointer; width:28px; height:28px; border:none; border-radius:4px; background:transparent;">
+                                    <span id="lblColorFondoHex" style="font-size:0.85rem; color:var(--accent); font-weight:bold; font-family:monospace;">#1a1a2e</span>
+                                </div>
+                            </div>
+                            
+                            <div class="color-palette-swatches" id="colorPaletteSwatches" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+                                <button type="button" class="btn-color-swatch active" data-color="#1a1a2e" onclick="seleccionarSwatchColor('#1a1a2e', this)" style="background:#1a1a2e;" title="Oscuro FNF (#1a1a2e)"></button>
+                                <button type="button" class="btn-color-swatch" data-color="#000000" onclick="seleccionarSwatchColor('#000000', this)" style="background:#000000;" title="Negro Puro (#000000)"></button>
+                                <button type="button" class="btn-color-swatch" data-color="#ffffff" onclick="seleccionarSwatchColor('#ffffff', this)" style="background:#ffffff;" title="Blanco (#ffffff)"></button>
+                                <button type="button" class="btn-color-swatch" data-color="#00ff00" onclick="seleccionarSwatchColor('#00ff00', this)" style="background:#00ff00;" title="Croma Verde (#00ff00)"></button>
+                                <button type="button" class="btn-color-swatch" data-color="#0033ff" onclick="seleccionarSwatchColor('#0033ff', this)" style="background:#0033ff;" title="Croma Azul (#0033ff)"></button>
+                                <button type="button" class="btn-color-swatch" data-color="#ff007f" onclick="seleccionarSwatchColor('#ff007f', this)" style="background:#ff007f;" title="Rosa Neón (#ff007f)"></button>
+                                <button type="button" class="btn-color-swatch" data-color="#ffcc00" onclick="seleccionarSwatchColor('#ffcc00', this)" style="background:#ffcc00;" title="Amarillo Funkin (#ffcc00)"></button>
+                                <button type="button" class="btn-color-swatch" data-color="#3a3b4c" onclick="seleccionarSwatchColor('#3a3b4c', this)" style="background:#3a3b4c;" title="Gris Estudio (#3a3b4c)"></button>
+                                <button type="button" class="btn-color-swatch" data-color="#00e5ff" onclick="seleccionarSwatchColor('#00e5ff', this)" style="background:#00e5ff;" title="Cian Brillante (#00e5ff)"></button>
+                                <button type="button" class="btn-color-swatch" data-color="#8b00ff" onclick="seleccionarSwatchColor('#8b00ff', this)" style="background:#8b00ff;" title="Morado Oscuro (#8b00ff)"></button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="preview-box">
+                        <div style="position:absolute; top:10px; right:10px; background:rgba(0,0,0,0.6); padding:5px 10px; border-radius:5px; color:#fff; font-size:0.8rem; font-weight:bold;" id="txtFrameCount">0 Frames</div>
+                        <img id="previewGifImg" src="" style="display:none;">
+                        <div id="previewPlaceholder" style="color:#666; font-weight:bold; font-size:1.2rem;">VISTA PREVIA</div>
+                    </div>
+
+                    <!-- SECUENCIADOR DE FRAMES -->
+                    <div id="gifSequencer" style="display:none; margin-top:20px; margin-bottom:20px;">
+                        <label style="color:#fff; font-weight:bold; margin-bottom:10px; display:block;"><img src="https://cdn-icons-png.flaticon.com/128/833/833281.png" style="width:20px; filter:invert(1); vertical-align:middle;"> Secuenciador de Animación (Modificar Frames):</label>
+                        <div id="gifSequencerTrack" style="display:flex; overflow-x:auto; background:rgba(0,0,0,0.4); padding:15px; border-radius:8px; gap:15px; min-height:120px; align-items:center;">
+                            <!-- Se inyecta desde js -->
+                        </div>
+                    </div>
+
+                    <button class="btn-pildora btn-primario" id="btnGenerarGif" style="width:100%; font-size:1.2rem; padding:15px; display:none;" onclick="generarGif()">
+                        <img src="https://cdn-icons-png.flaticon.com/512/1210/1210214.png" class="icon" style="filter:invert(1);">
+                        EXPORTAR COMO GIF
+                    </button>
+                    
+                    <a id="btnDescargarGif" class="btn-pildora btn-secundario" style="width:100%; font-size:1.2rem; padding:15px; display:none; text-align:center; text-decoration:none; border-color:var(--accent-green); color:var(--accent-green);">
+                        <img src="https://cdn-icons-png.flaticon.com/512/1159/1159330.png" class="icon" style="filter:invert(50%) sepia(90%) saturate(1350%) hue-rotate(90deg) brightness(100%) contrast(100%);">
+                        Descargar GIF Generado
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL HISTORIAL -->
+    <div class="overlay-modal" id="historyModal" style="display:none;">
+        <div class="modal-box">
+            <h2 class="modal-title"><img src="https://cdn-icons-png.flaticon.com/128/2088/2088617.png"
+                    style="width:30px; filter:brightness(0) invert(1);"> Sesión Anterior</h2>
+            <div class="modal-body" id="historyModalContent">
+                <!-- Se inyecta desde js -->
+            </div>
+            <button class="btn-pildora btn-secundario" style="width:100%; margin-top:20px;"
+                onclick="closeHistoryModal()">Cancelar</button>
+        </div>
+    </div>
+
+    <!-- Theme Modal -->
+    <div class="overlay-modal" id="themeModal" style="display: none;">
+        <div class="modal-content">
+            <h2 class="modal-title"><img src="https://cdn-icons-png.flaticon.com/128/893/893322.png"
+                    style="width:30px; filter:brightness(0) invert(1);"> Personalizar Tema</h2>
+            <div class="modal-body">
+                <p>Elige tu color de acento favorito:</p>
+                <div class="theme-colors">
+                    <div class="color-btn" style="background: #00e5ff" onclick="setThemeColor('cyan')"></div>
+                    <div class="color-btn" style="background: #ff007f" onclick="setThemeColor('pink')"></div>
+                    <div class="color-btn" style="background: #a800ff" onclick="setThemeColor('purple')"></div>
+                    <div class="color-btn" style="background: #00ff88" onclick="setThemeColor('green')"></div>
+                    <div class="color-btn" style="background: #ffaa00" onclick="setThemeColor('orange')"></div>
+                </div>
+            </div>
+            <button class="btn-pildora btn-secundario" style="width:100%; margin-top:20px;"
+                onclick="closeThemeModal()">Cerrar</button>
+        </div>
+    </div>
+
+    <!-- FAB WRAPPER: MODO OSCURO -->
+    <div class="fab-wrap-dark">
+        <button class="fab-btn darkmode-btn" onclick="toggleDarkMode()" title="Modo Oscuro/Claro">
+            <img src="https://cdn-icons-png.flaticon.com/128/11885/11885172.png" id="darkModeIcon"
+                class="icon-sm icon-black" alt="Dark Mode">
+        </button>
+    </div>
+
+    <!-- FAB WRAPPER: HISTORIAL -->
+    <div class="fab-wrap-history">
+        <button class="fab-btn history-btn" onclick="showHistoryModal()" title="Historial / Autoguardado"
+            style="background: rgba(255,170,0,0.6);">
+            <img src="https://cdn-icons-png.flaticon.com/128/2088/2088617.png" class="icon-sm icon-black"
+                alt="History">
+        </button>
+    </div>
+
+    <!-- FAB WRAPPER: TEMA -->
+    <div class="fab-wrap-theme">
+        <button class="fab-btn theme-btn" onclick="toggleThemeMenu()" title="Cambiar Tema">
+            <img src="https://cdn-icons-png.flaticon.com/128/893/893322.png" class="icon-sm icon-black" alt="Theme">
+        </button>
+        <div class="fab-menu" id="fabThemeMenu">
+            <button class="fab-item" onclick="changeTheme('cyberpunk'); toggleThemeMenu();">
+                <span class="fab-color-dot" style="background: #f1a9d4;"></span> Pastel (Predeterminado)
+            </button>
+            <button class="fab-item" onclick="changeTheme('psych'); toggleThemeMenu();">
+                <span class="fab-color-dot" style="background: #aaff00;"></span> Tema Psych
+            </button>
+            <button class="fab-item" onclick="changeTheme('bf'); toggleThemeMenu();">
+                <span class="fab-color-dot" style="background: #31b0d1;"></span> Tema BF
+            </button>
+        </div>
+    </div>
+
+    <div class="overlay-modal" id="changelogModal" style="display: none;">
+        <div class="modal-box modal-box-changelog"></div>
+    </div>
+
+    <script src="js/history.js?v=2"></script>
+    <script src="js/main.js?v=2" defer></script>
+    <script src="js/generador_gif.js?v=2" defer></script>
+    <script>window.addEventListener("DOMContentLoaded", () => { appMode = "GIF"; if (typeof toggleNavButtons === "function") toggleNavButtons(); if (typeof openWindow === "function") openWindow("win-gif"); setTimeout(()=>{ if(typeof seleccionarModo === "function") seleccionarModo("C"); }, 100); });</script>
+</body>
+</html>

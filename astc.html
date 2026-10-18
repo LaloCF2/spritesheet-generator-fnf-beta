@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Estudio ASTC FNF' (Móviles / Android)</title>
+
+    <link rel="stylesheet" href="css/themes.css?v=2">
+    <link rel="stylesheet" href="css/base.css?v=2">
+    <link rel="stylesheet" href="css/components.css?v=2">
+    <link rel="stylesheet" href="css/windows.css?v=2">
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1a1a2e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="SpriteGen FNF">
+    <link rel="apple-touch-icon" href="logo-192.png">
+
+    <style>
+        #win-astc-hub {
+            display: flex !important;
+        }
+
+        .astc-hub-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+            margin-bottom: 25px;
+        }
+
+        .astc-mode-card {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 16px;
+            padding: 24px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 240px;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .astc-mode-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, var(--accent, #00e5ff), transparent);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .astc-mode-card:hover {
+            transform: translateY(-6px);
+            background: rgba(255, 255, 255, 0.08);
+            border-color: var(--accent, #00e5ff);
+            box-shadow: 0 10px 25px rgba(0, 229, 255, 0.25);
+        }
+
+        .astc-mode-card:hover::before {
+            opacity: 1;
+        }
+
+        .astc-mode-card:active {
+            transform: translateY(-2px) scale(0.98);
+        }
+
+        .astc-mode-badge {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            font-size: 0.7rem;
+            font-weight: 800;
+            padding: 3px 8px;
+            border-radius: 20px;
+            background: rgba(0, 229, 255, 0.15);
+            color: var(--accent, #00e5ff);
+            border: 1px solid rgba(0, 229, 255, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .astc-mode-icon {
+            width: 72px;
+            height: 72px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 15px;
+            margin-top: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .astc-mode-card:hover .astc-mode-icon {
+            transform: scale(1.1) rotate(2deg);
+        }
+
+        .astc-mode-icon img {
+            width: 44px;
+            height: 44px;
+            object-fit: contain;
+        }
+
+        .astc-mode-title {
+            font-size: 1.15rem;
+            font-weight: 800;
+            color: #ffffff;
+            margin-bottom: 8px;
+            letter-spacing: 0.3px;
+        }
+
+        .astc-mode-desc {
+            font-size: 0.85rem;
+            color: #b0b0c0;
+            line-height: 1.45;
+            margin-bottom: 18px;
+            flex-grow: 1;
+        }
+
+        .astc-mode-btn {
+            width: 100%;
+            padding: 10px 16px;
+            border-radius: 25px;
+            font-weight: 700;
+            font-size: 0.85rem;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            transition: all 0.25s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .info-pill-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 15px;
+            padding: 14px;
+            background: rgba(0, 0, 0, 0.25);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .info-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.78rem;
+            color: #ccc;
+            padding: 4px 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+        }
+
+        .info-pill b {
+            color: var(--accent, #00e5ff);
+        }
+
+        @media (max-width: 768px) {
+            .astc-hub-container {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+            .astc-mode-card {
+                padding: 20px 16px;
+                min-height: auto;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- SISTEMA DE CARGA GLOBAL -->
+    <div id="globalLoader" class="global-loader">
+        <div class="loader-content">
+            <div class="ia-spinner"></div>
+            <p id="globalLoaderText"
+                style="color: white; font-weight: bold; margin-top: 15px; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
+                Iniciando...</p>
+        </div>
+    </div>
+
+    <div class="glass-bg">
+        <div class="glass-blob blob-1"></div>
+        <div class="glass-blob blob-2"></div>
+        <div class="glass-blob blob-3"></div>
+        <div class="glass-blob blob-4"></div>
+    </div>
+
+    <div class="app-header">
+        <h1 class="app-title" onclick="location.reload()" style="cursor:pointer;" title="Recargar página">
+            <img src="logo-192.png" class="icon logo-icon" alt="Logo">
+            Spritesheet Generator FNF'
+        </h1>
+
+        <div class="window-nav">
+            <button class="win-btn" onclick="window.location.href='index.html'">
+                <img src="https://cdn-icons-png.flaticon.com/128/4675/4675164.png" class="icon" alt="Inicio">
+                Inicio
+            </button>
+            <button class="win-btn" onclick="window.location.href='generador_gif.html'">
+                <img src="https://cdn-icons-png.flaticon.com/512/1210/1210214.png" class="icon" alt="GIF">
+                Generador GIF
+            </button>
+            <button class="win-btn active">
+                <img src="https://cdn-icons-png.flaticon.com/128/3114/3114883.png" class="icon" alt="ASTC"
+                    style="filter: brightness(0) saturate(100%) invert(73%) sepia(50%) saturate(543%) hue-rotate(170deg) brightness(103%) contrast(101%);">
+                Estudio ASTC
+            </button>
+        </div>
+    </div>
+
+    <div class="main-container" style="overflow-y: auto; max-height: calc(100vh - 80px); padding-bottom: 100px;">
+        <div class="tool-window shadow-pop"
+            style="animation-delay: 0.1s; max-width: 950px; margin: 0 auto; display:block;">
+            <div class="window-header">
+                <div class="window-title">
+                    <img src="https://cdn-icons-png.flaticon.com/128/3114/3114883.png" class="icon" alt="ASTC"
+                        style="filter:invert(1)">
+                    Estudio de Texturas ASTC (Móviles / Android)
+                </div>
+            </div>
+
+            <div class="window-content active" id="win-astc-hub">
+                <p style="color: #bbb; margin-bottom: 10px; font-size:0.92rem; line-height: 1.5;">
+                    Selecciona una herramienta especializada para trabajar con texturas comprimidas <b>.ASTC</b>
+                    utilizadas en <b>Friday Night Funkin' Android</b> y <b>Psych Engine Mobile</b>:
+                </p>
+
+                <div class="astc-hub-container">
+                    <!-- Opción 1: ASTC + XML (Optimizador) -->
+                    <div class="astc-mode-card" onclick="window.location.href='astc_xml.html'">
+                        <span class="astc-mode-badge" style="color:#00e5ff; border-color:rgba(0,229,255,0.4); background:rgba(0,229,255,0.12);">Completo</span>
+                        <div class="astc-mode-icon" style="background: rgba(0, 229, 255, 0.1); border-color: rgba(0, 229, 255, 0.25);">
+                            <img src="https://cdn-icons-png.flaticon.com/128/7100/7100753.png"
+                                style="filter: brightness(0) saturate(100%) invert(73%) sepia(50%) saturate(543%) hue-rotate(170deg) brightness(103%) contrast(101%);"
+                                alt="ASTC XML">
+                        </div>
+                        <div class="astc-mode-title">ASTC + XML (Optimizador)</div>
+                        <div class="astc-mode-desc">
+                            Importa tu textura <b>.astc</b> con su <b>.xml</b>. Cuenta con secuenciador de frames, cambio de escala/resolución, auto-alineación de Psych Engine y exportación.
+                        </div>
+                        <div class="astc-mode-btn btn-pildora btn-secundario" style="border-color:#00e5ff; color:#00e5ff;">
+                            Abrir Optimizador ASTC
+                        </div>
+                    </div>
+
+                    <!-- Opción 2: ASTC a PNG -->
+                    <div class="astc-mode-card" onclick="window.location.href='astc_to_png.html'">
+                        <span class="astc-mode-badge" style="color:#00ff88; border-color:rgba(0,255,136,0.4); background:rgba(0,255,136,0.12);">Decodificar</span>
+                        <div class="astc-mode-icon" style="background: rgba(0, 255, 136, 0.1); border-color: rgba(0, 255, 136, 0.25);">
+                            <img src="https://cdn-icons-png.flaticon.com/512/8682/8682596.png"
+                                style="filter: brightness(0) saturate(100%) invert(80%) sepia(40%) saturate(600%) hue-rotate(90deg) brightness(102%) contrast(102%);"
+                                alt="ASTC a PNG">
+                        </div>
+                        <div class="astc-mode-title">Convertir ASTC a PNG</div>
+                        <div class="astc-mode-desc">
+                            Decodifica cualquier archivo <b>.astc</b> directamente a imagen <b>.png</b> nítida en tu navegador. Incluye visor interactivo de textura y descarga instantánea.
+                        </div>
+                        <div class="astc-mode-btn btn-pildora btn-secundario" style="border-color:#00ff88; color:#00ff88;">
+                            Convertir a PNG
+                        </div>
+                    </div>
+
+                    <!-- Opción 3: PNG a ASTC -->
+                    <div class="astc-mode-card" onclick="window.location.href='png_to_astc.html'">
+                        <span class="astc-mode-badge" style="color:#ffaa00; border-color:rgba(255,170,0,0.4); background:rgba(255,170,0,0.12);">Convertir</span>
+                        <div class="astc-mode-icon" style="background: rgba(255, 170, 0, 0.1); border-color: rgba(255, 170, 0, 0.25);">
+                            <img src="https://cdn-icons-png.flaticon.com/512/8208/8208316.png"
+                                style="filter: brightness(0) saturate(100%) invert(67%) sepia(98%) saturate(1906%) hue-rotate(359deg) brightness(101%) contrast(105%);"
+                                alt="PNG a ASTC">
+                        </div>
+                        <div class="astc-mode-title">Convertir PNG a ASTC</div>
+                        <div class="astc-mode-desc">
+                            Convierte imágenes <b>.png</b> (con opción de usar su <b>.xml</b> de base) a texturas <b>.astc</b> ultra ligeras con orientación normal de pie (sin archivo ZIP).
+                        </div>
+                        <div class="astc-mode-btn btn-pildora btn-secundario" style="border-color:#ffaa00; color:#ffaa00;">
+                            Convertir a ASTC
+                        </div>
+                    </div>
+
+                    <!-- Opción 4: Compresor de Texturas ASTC -->
+                    <div class="astc-mode-card" onclick="window.location.href='compresor_astc.html'">
+                        <span class="astc-mode-badge" style="color:#b57cff; border-color:rgba(181,124,255,0.4); background:rgba(181,124,255,0.12);">Optimizar Peso</span>
+                        <div class="astc-mode-icon" style="background: rgba(181, 124, 255, 0.1); border-color: rgba(181, 124, 255, 0.25);">
+                            <img src="https://cdn-icons-png.flaticon.com/128/11252/11252744.png"
+                                style="filter: brightness(0) saturate(100%) invert(58%) sepia(56%) saturate(4171%) hue-rotate(244deg) brightness(102%) contrast(101%);"
+                                alt="Compresor ASTC">
+                        </div>
+                        <div class="astc-mode-title">Compresor de Texturas ASTC</div>
+                        <div class="astc-mode-desc">
+                            ¿Tu archivo <b>.astc</b> pesa demasiado? Recomprímelo a bloques ultra ligeros (10x10, 12x12) y limpia alpha para reducir drásticamente su peso conservando su resolución intacta.
+                        </div>
+                        <div class="astc-mode-btn btn-pildora btn-secundario" style="border-color:#b57cff; color:#b57cff;">
+                            Comprimir ASTC
+                        </div>
+                    </div>
+                </div>
+
+                <div class="info-pill-bar">
+                    <div class="info-pill">
+                        <span>📱</span> Optimizado para <b>Android y Móviles</b>
+                    </div>
+                    <div class="info-pill">
+                        <span>⚡</span> Decodificación y Codificación <b>WASM Offline</b> (Sin Servidor)
+                    </div>
+                    <div class="info-pill">
+                        <span>🧱</span> Bloques Oficiales <b>4×4 hasta 12×12</b>
+                    </div>
+                    <div class="info-pill">
+                        <span>🎯</span> Cabecera estándar oficial de <b>16 bytes</b>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL HISTORIAL -->
+    <div class="overlay-modal" id="historyModal" style="display:none;">
+        <div class="modal-box">
+            <h2 class="modal-title"><img src="https://cdn-icons-png.flaticon.com/128/2088/2088617.png"
+                    style="width:30px; filter:brightness(0) invert(1);"> Sesión Anterior</h2>
+            <div class="modal-body" id="historyModalContent"></div>
+            <button class="btn-pildora btn-secundario" style="width:100%; margin-top:20px;"
+                onclick="closeHistoryModal()">Cancelar</button>
+        </div>
+    </div>
+
+    <!-- Theme Modal -->
+    <div class="overlay-modal" id="themeModal" style="display: none;">
+        <div class="modal-content">
+            <h2 class="modal-title"><img src="https://cdn-icons-png.flaticon.com/128/893/893322.png"
+                    style="width:30px; filter:brightness(0) invert(1);"> Personalizar Tema</h2>
+            <div class="modal-body">
+                <p>Elige tu color de acento favorito:</p>
+                <div class="theme-colors">
+                    <div class="color-btn" style="background: #00e5ff" onclick="setThemeColor('cyan')"></div>
+                    <div class="color-btn" style="background: #ff007f" onclick="setThemeColor('pink')"></div>
+                    <div class="color-btn" style="background: #a800ff" onclick="setThemeColor('purple')"></div>
+                    <div class="color-btn" style="background: #00ff88" onclick="setThemeColor('green')"></div>
+                    <div class="color-btn" style="background: #ffaa00" onclick="setThemeColor('orange')"></div>
+                </div>
+            </div>
+            <button class="btn-pildora btn-secundario" style="width:100%; margin-top:20px;"
+                onclick="closeThemeModal()">Cerrar</button>
+        </div>
+    </div>
+
+    <!-- FAB WRAPPER: MODO OSCURO -->
+    <div class="fab-wrap-dark">
+        <button class="fab-btn darkmode-btn" onclick="toggleDarkMode()" title="Modo Oscuro/Claro">
+            <img src="https://cdn-icons-png.flaticon.com/128/11885/11885172.png" id="darkModeIcon"
+                class="icon-sm icon-black" alt="Dark Mode">
+        </button>
+    </div>
+
+    <!-- FAB WRAPPER: HISTORIAL -->
+    <div class="fab-wrap-history">
+        <button class="fab-btn history-btn" onclick="showHistoryModal()" title="Historial / Autoguardado"
+            style="background: rgba(255,170,0,0.6);">
+            <img src="https://cdn-icons-png.flaticon.com/128/2088/2088617.png" class="icon-sm icon-black"
+                alt="History">
+        </button>
+    </div>
+
+    <!-- FAB WRAPPER: TEMA -->
+    <div class="fab-wrap-theme">
+        <button class="fab-btn theme-btn" onclick="toggleThemeMenu()" title="Cambiar Tema">
+            <img src="https://cdn-icons-png.flaticon.com/128/893/893322.png" class="icon-sm icon-black" alt="Theme">
+        </button>
+        <div class="fab-menu" id="fabThemeMenu">
+            <button class="fab-item" onclick="changeTheme('cyberpunk'); toggleThemeMenu();">
+                <span class="fab-color-dot" style="background: #f1a9d4;"></span> Pastel (Predeterminado)
+            </button>
+            <button class="fab-item" onclick="changeTheme('psych'); toggleThemeMenu();">
+                <span class="fab-color-dot" style="background: #aaff00;"></span> Tema Psych
+            </button>
+            <button class="fab-item" onclick="changeTheme('bf'); toggleThemeMenu();">
+                <span class="fab-color-dot" style="background: #31b0d1;"></span> Tema BF
+            </button>
+        </div>
+    </div>
+
+    <div class="overlay-modal" id="changelogModal" style="display: none;">
+        <div class="modal-box modal-box-changelog"></div>
+    </div>
+
+    <script src="js/history.js?v=2"></script>
+    <script src="js/main.js?v=2" defer></script>
+    <script>
+        window.addEventListener("DOMContentLoaded", () => {
+            appMode = "ASTC";
+            if (typeof toggleNavButtons === "function") toggleNavButtons();
+            if (typeof openWindow === "function") openWindow("win-astc-hub");
+        });
+    </script>
+</body>
+</html>

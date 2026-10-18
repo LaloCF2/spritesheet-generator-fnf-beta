@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Convertir ASTC a PNG | Spritesheet Generator FNF'</title>
+
+    <link rel="stylesheet" href="css/themes.css?v=2">
+    <link rel="stylesheet" href="css/base.css?v=2">
+    <link rel="stylesheet" href="css/components.css?v=2">
+    <link rel="stylesheet" href="css/windows.css?v=2">
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1a1a2e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="SpriteGen FNF">
+    <link rel="apple-touch-icon" href="logo-192.png">
+
+    <!-- ASTC Engine WebAssembly -->
+    <script src="js/astc_engine.js?v=2"></script>
+
+    <style>
+        #win-astc-to-png {
+            display: flex !important;
+        }
+
+        .astc-viewer-box {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 15px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: rgba(0, 0, 0, 0.35);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 12px 14px;
+            text-align: center;
+        }
+
+        .stat-card .label {
+            font-size: 0.72rem;
+            color: #aaa;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .stat-card .value {
+            font-size: 1.05rem;
+            font-weight: 800;
+            color: var(--accent, #00e5ff);
+        }
+
+        .canvas-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 12px;
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+        }
+
+        .toolbar-group {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .tb-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: white;
+            border-radius: 6px;
+            padding: 6px 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .tb-btn:hover {
+            background: rgba(255, 255, 255, 0.18);
+            border-color: var(--accent, #00e5ff);
+        }
+
+        .tb-btn.active {
+            background: var(--accent, #00e5ff);
+            color: black;
+            border-color: var(--accent, #00e5ff);
+        }
+
+        .preview-viewport {
+            min-height: 340px;
+            max-height: 600px;
+            overflow: auto;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            padding: 20px;
+            transition: background 0.2s ease;
+        }
+
+        .bg-checker {
+            background-color: #1e1e24;
+            background-image: 
+                linear-gradient(45deg, #2a2a35 25%, transparent 25%), 
+                linear-gradient(-45deg, #2a2a35 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, #2a2a35 75%), 
+                linear-gradient(-45deg, transparent 75%, #2a2a35 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+
+        .bg-black {
+            background: #000000;
+        }
+
+        .bg-white {
+            background: #ffffff;
+        }
+
+        #previewCanvas {
+            max-width: 100%;
+            height: auto;
+            transform-origin: center center;
+            transition: transform 0.15s ease-out;
+            image-rendering: auto;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+
+        @media (max-width: 600px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .canvas-toolbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .toolbar-group {
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- SISTEMA DE CARGA GLOBAL -->
+    <div id="globalLoader" class="global-loader">
+        <div class="loader-content">
+            <div class="ia-spinner"></div>
+            <p id="globalLoaderText"
+                style="color: white; font-weight: bold; margin-top: 15px; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
+                Iniciando...</p>
+        </div>
+    </div>
+
+    <div class="glass-bg">
+        <div class="glass-blob blob-1"></div>
+        <div class="glass-blob blob-2"></div>
+        <div class="glass-blob blob-3"></div>
+        <div class="glass-blob blob-4"></div>
+    </div>
+
+    <div class="drag-overlay" id="dragOverlay">
+        <div class="drag-overlay-content">
+            <img src="https://cdn-icons-png.flaticon.com/512/716/716784.png"
+                style="width: 80px; filter: brightness(0) invert(1); margin-bottom: 20px;"><br>
+            SUELTA EL ARCHIVO .ASTC AQUÍ
+        </div>
+    </div>
+
+    <div class="app-header">
+        <h1 class="app-title" onclick="location.reload()" style="cursor:pointer;" title="Recargar página">
+            <img src="logo-192.png" class="icon logo-icon" alt="Logo">
+            Spritesheet Generator FNF'
+        </h1>
+
+        <div class="window-nav">
+            <button class="win-btn" onclick="window.location.href='index.html'">
+                <img src="https://cdn-icons-png.flaticon.com/128/4675/4675164.png" class="icon" alt="Inicio">
+                Inicio
+            </button>
+            <button class="win-btn" onclick="window.location.href='astc.html'">
+                <img src="https://cdn-icons-png.flaticon.com/128/3114/3114883.png" class="icon" alt="ASTC"
+                    style="filter: brightness(0) saturate(100%) invert(73%) sepia(50%) saturate(543%) hue-rotate(170deg) brightness(103%) contrast(101%);">
+                Estudio ASTC
+            </button>
+            <button class="win-btn active">
+                <img src="https://cdn-icons-png.flaticon.com/512/8682/8682596.png" class="icon" alt="ASTC a PNG">
+                ASTC a PNG
+            </button>
+        </div>
+    </div>
+
+    <div class="main-container" style="overflow-y: auto; max-height: calc(100vh - 80px); padding-bottom: 100px;">
+        <div class="tool-window shadow-pop"
+            style="animation-delay: 0.1s; max-width: 950px; margin: 0 auto; display:block;">
+            <div class="window-header">
+                <div class="window-title">
+                    <img src="https://cdn-icons-png.flaticon.com/512/8682/8682596.png" class="icon" alt="ASTC a PNG"
+                        style="filter:invert(1)">
+                    Convertir Textura ASTC a PNG
+                </div>
+            </div>
+
+            <div class="window-content active" id="win-astc-to-png">
+                <p style="color: #bbb; margin-bottom: 18px; font-size:0.92rem;">
+                    Sube una textura <b>.ASTC</b> para decodificarla al instante a formato <b>.PNG</b> de máxima calidad. Puedes inspeccionar sus bloques y descargar la imagen limpia:
+                </p>
+
+                <!-- Input Upload -->
+                <div class="dual-upload" style="margin-bottom: 20px; justify-content: center;">
+                    <input type="file" id="astcFileInput" class="hidden-file" accept=".astc">
+                    <button class="btn-pildora btn-secundario" id="btnUploadAstc"
+                        style="border-color:#00ff88; color:#00ff88; padding: 12px 24px; font-size: 1rem;"
+                        onclick="document.getElementById('astcFileInput').click();">
+                        <img src="https://cdn-icons-png.flaticon.com/128/3114/3114883.png" class="icon" alt="ASTC"
+                            style="filter: brightness(0) saturate(100%) invert(80%) sepia(40%) saturate(600%) hue-rotate(90deg) brightness(102%) contrast(102%);">
+                        Subir Archivo .ASTC
+                    </button>
+                </div>
+
+                <!-- Stats Container (Initially hidden) -->
+                <div id="astcStatsContainer" class="stats-grid" style="display:none;">
+                    <div class="stat-card">
+                        <div class="label">Resolución</div>
+                        <div class="value" id="statResolution">-- × --</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">Bloque (Footprint)</div>
+                        <div class="value" id="statBlockSize">-- × --</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">Bitrate</div>
+                        <div class="value" id="statBitrate">-- bpp</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">Peso ASTC</div>
+                        <div class="value" id="statFileSize">-- KB</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">Total Bloques</div>
+                        <div class="value" id="statBlocksCount">--</div>
+                    </div>
+                </div>
+
+                <!-- Preview Container (Initially hidden) -->
+                <div id="astcPreviewContainer" class="astc-viewer-box" style="display:none;">
+                    <div class="canvas-toolbar">
+                        <div class="toolbar-group">
+                            <span style="font-size:0.8rem; color:#aaa; font-weight:bold;">Zoom:</span>
+                            <button class="tb-btn" id="btnZoomOut">-</button>
+                            <span id="zoomLabel" style="font-size:0.85rem; font-weight:800; min-width: 45px; text-align:center;">100%</span>
+                            <button class="tb-btn" id="btnZoomIn">+</button>
+                            <button class="tb-btn" id="btnZoomReset">Ajustar</button>
+                        </div>
+
+                        <div class="toolbar-group">
+                            <span style="font-size:0.8rem; color:#aaa; font-weight:bold;">Fondo:</span>
+                            <button class="tb-btn active" id="btnBgChecker">Ajedrez</button>
+                            <button class="tb-btn" id="btnBgBlack">Negro</button>
+                            <button class="tb-btn" id="btnBgWhite">Blanco</button>
+                        </div>
+
+                        <div class="toolbar-group">
+                            <span style="font-size:0.8rem; color:#aaa; font-weight:bold;">Orientación:</span>
+                            <button class="tb-btn" id="btnFlipV" title="Voltear Verticalmente">↕ Voltear Y</button>
+                            <button class="tb-btn" id="btnFlipH" title="Voltear Horizontalmente / Espejo">↔ Espejo X</button>
+                        </div>
+
+                        <div class="toolbar-group">
+                            <button class="btn-pildora" id="btnDownloadPng"
+                                style="background:var(--accent-pink, #ff007f); color:white; border:none; padding: 7px 16px;">
+                                <img src="https://cdn-icons-png.flaticon.com/512/2874/2874091.png" class="icon" alt="Download"
+                                    style="filter: brightness(0) invert(1);">
+                                Descargar PNG
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="preview-viewport bg-checker" id="previewBox">
+                        <canvas id="previewCanvas"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL HISTORIAL -->
+    <div class="overlay-modal" id="historyModal" style="display:none;">
+        <div class="modal-box">
+            <h2 class="modal-title"><img src="https://cdn-icons-png.flaticon.com/128/2088/2088617.png"
+                    style="width:30px; filter:brightness(0) invert(1);"> Sesión Anterior</h2>
+            <div class="modal-body" id="historyModalContent"></div>
+            <button class="btn-pildora btn-secundario" style="width:100%; margin-top:20px;"
+                onclick="closeHistoryModal()">Cancelar</button>
+        </div>
+    </div>
+
+    <!-- Theme Modal -->
+    <div class="overlay-modal" id="themeModal" style="display: none;">
+        <div class="modal-content">
+            <h2 class="modal-title"><img src="https://cdn-icons-png.flaticon.com/128/893/893322.png"
+                    style="width:30px; filter:brightness(0) invert(1);"> Personalizar Tema</h2>
+            <div class="modal-body">
+                <p>Elige tu color de acento favorito:</p>
+                <div class="theme-colors">
+                    <div class="color-btn" style="background: #00e5ff" onclick="setThemeColor('cyan')"></div>
+                    <div class="color-btn" style="background: #ff007f" onclick="setThemeColor('pink')"></div>
+                    <div class="color-btn" style="background: #a800ff" onclick="setThemeColor('purple')"></div>
+                    <div class="color-btn" style="background: #00ff88" onclick="setThemeColor('green')"></div>
+                    <div class="color-btn" style="background: #ffaa00" onclick="setThemeColor('orange')"></div>
+                </div>
+            </div>
+            <button class="btn-pildora btn-secundario" style="width:100%; margin-top:20px;"
+                onclick="closeThemeModal()">Cerrar</button>
+        </div>
+    </div>
+
+    <!-- FAB WRAPPER: MODO OSCURO -->
+    <div class="fab-wrap-dark">
+        <button class="fab-btn darkmode-btn" onclick="toggleDarkMode()" title="Modo Oscuro/Claro">
+            <img src="https://cdn-icons-png.flaticon.com/128/11885/11885172.png" id="darkModeIcon"
+                class="icon-sm icon-black" alt="Dark Mode">
+        </button>
+    </div>
+
+    <!-- FAB WRAPPER: HISTORIAL -->
+    <div class="fab-wrap-history">
+        <button class="fab-btn history-btn" onclick="showHistoryModal()" title="Historial / Autoguardado"
+            style="background: rgba(255,170,0,0.6);">
+            <img src="https://cdn-icons-png.flaticon.com/128/2088/2088617.png" class="icon-sm icon-black"
+                alt="History">
+        </button>
+    </div>
+
+    <!-- FAB WRAPPER: TEMA -->
+    <div class="fab-wrap-theme">
+        <button class="fab-btn theme-btn" onclick="toggleThemeMenu()" title="Cambiar Tema">
+            <img src="https://cdn-icons-png.flaticon.com/128/893/893322.png" class="icon-sm icon-black" alt="Theme">
+        </button>
+        <div class="fab-menu" id="fabThemeMenu">
+            <button class="fab-item" onclick="changeTheme('cyberpunk'); toggleThemeMenu();">
+                <span class="fab-color-dot" style="background: #f1a9d4;"></span> Pastel (Predeterminado)
+            </button>
+            <button class="fab-item" onclick="changeTheme('psych'); toggleThemeMenu();">
+                <span class="fab-color-dot" style="background: #aaff00;"></span> Tema Psych
+            </button>
+            <button class="fab-item" onclick="changeTheme('bf'); toggleThemeMenu();">
+                <span class="fab-color-dot" style="background: #31b0d1;"></span> Tema BF
+            </button>
+        </div>
+    </div>
+
+    <div class="overlay-modal" id="changelogModal" style="display: none;">
+        <div class="modal-box modal-box-changelog"></div>
+    </div>
+
+    <script src="js/history.js?v=2"></script>
+    <script src="js/main.js?v=2" defer></script>
+    <script src="js/astc_to_png.js?v=2" defer></script>
+    <script>
+        window.addEventListener("DOMContentLoaded", () => {
+            appMode = "ASTC";
+            if (typeof toggleNavButtons === "function") toggleNavButtons();
+            if (typeof openWindow === "function") openWindow("win-astc-to-png");
+        });
+    </script>
+</body>
+</html>

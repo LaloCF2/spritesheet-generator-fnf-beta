@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spritesheet Generator FNF</title>
+
+    <link rel="stylesheet" href="css/themes.css">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/windows.css">
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#020308">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="SpriteGen FNF">
+    <link rel="apple-touch-icon" href="logo-192.png">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/upng-js@2.1.0/UPNG.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
+</head>
+
+<body>
+
+    <!-- SISTEMA DE CARGA GLOBAL -->
+    <div id="globalLoader" class="global-loader">
+        <div class="loader-content">
+            <div class="ia-spinner"></div>
+            <p id="globalLoaderText"
+                style="color: white; font-weight: bold; margin-top: 15px; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
+                Iniciando...</p>
+        </div>
+    </div>
+
+    <div class="glass-bg">
+        <div class="glass-blob blob-1"></div>
+        <div class="glass-blob blob-2"></div>
+        <div class="glass-blob blob-3"></div>
+        <div class="glass-blob blob-4"></div>
+    </div>
+
+    <div class="drag-overlay" id="dragOverlay">
+        <div class="drag-overlay-content">
+            <img src="https://cdn-icons-png.flaticon.com/512/716/716784.png"
+                style="width: 80px; filter: brightness(0) invert(1); margin-bottom: 20px;"><br>
+            SUELTA EL ARCHIVO AQUÍ
+        </div>
+    </div>
+    <div class="app-header">
+        <h1 class="app-title" onclick="location.reload()" style="cursor:pointer;" title="Recargar página">
+            <img src="logo-192.png" class="icon logo-icon" alt="Logo">
+            Spritesheet Generator FNF'
+        </h1>
+
+        <div class="window-nav">
+            <button class="win-btn active" onclick="window.location.href='index.html'" id="navHome"><img
+                    src="https://cdn-icons-png.flaticon.com/128/4675/4675164.png" class="icon" alt="Inicio">
+                Inicio</button>
+            <button class="win-btn" onclick="openWindow('win-escaner')" id="navEscaner" style="display:none;"><img
+                    src="https://cdn-icons-png.flaticon.com/128/10301/10301595.png" class="icon" alt="Escaner">
+                Escáner</button>
+            <button class="win-btn" onclick="openWindow('win-orden')" id="navOrden" style="display:none;"><img
+                    src="https://cdn-icons-png.flaticon.com/512/151/151210.png" class="icon" alt="Secuenciador">
+                Secuenciador</button>
+            <button class="win-btn" onclick="openWindow('win-afinador')" id="navAfinador" style="display:none;"><img
+                    src="https://cdn-icons-png.flaticon.com/512/126/126472.png" class="icon" alt="Afinador">
+                Afinador</button>
+            <button class="win-btn psych-mode" onclick="openWindow('win-psych')" id="navPsych"
+                style="display:none;"><img src="https://cdn-icons-png.flaticon.com/512/3135/3135692.png" class="icon"
+                    alt="Psych"> Psych Live</button>
+
+            <button class="win-btn" onclick="openWindow('win-compresor')" id="navCompresor" style="display:none;"><img
+                    src="https://cdn-icons-png.flaticon.com/512/8208/8208316.png" class="icon" alt="Comprimir">
+                Compresor PNG</button>
+            <button class="win-btn" onclick="openWindow('win-audio')" id="navAudio"
+                style="display:none; color: #ffaa00; border-color: #ffaa00;"><img
+                    src="https://cdn-icons-png.flaticon.com/512/862/862700.png" class="icon"
+                    style="filter: brightness(0) saturate(100%) invert(67%) sepia(98%) saturate(1906%) hue-rotate(359deg) brightness(101%) contrast(105%);"
+                    alt="Audio"> Compresor OGG</button>
+            <button class="win-btn" onclick="openWindow('win-atlas')" id="navAtlas"
+                style="display:none; color: #ff3366; border-color: #ff3366;"><img
+                    src="https://cdn-icons-png.flaticon.com/512/8243/8243003.png" class="icon"
+                    style="filter: brightness(0) saturate(100%) invert(32%) sepia(97%) saturate(2250%) hue-rotate(327deg) brightness(101%) contrast(106%);"
+                    alt="Atlas"> Conversor Atlas</button>
+
+            <button class="win-btn btn-pack" onclick="repackAndExport()" id="navPack" style="display:none;"
+                title="Desduplica y Empaqueta en ZIP."><img
+                    src="https://cdn-icons-png.flaticon.com/512/1159/1159330.png" class="icon" alt="Pack"> Descargar
+                ZIP</button>
+            <button class="win-btn btn-export" onclick="exportarActual()" id="navExport" style="display:none;"><img
+                    src="https://cdn-icons-png.flaticon.com/512/2874/2874091.png" class="icon" id="iconExport"
+                    alt="Export"> Solo Guardar XML</button>
+        </div>
+    </div>
+
+    <div class="main-workspace">
+
+        <div id="win-audio" class="window-content">
+            <h2 class="section-title" style="color: #ffaa00;"><img
+                    src="https://cdn-icons-png.flaticon.com/512/862/862700.png" class="icon"
+                    style="filter: brightness(0) saturate(100%) invert(67%) sepia(98%) saturate(1906%) hue-rotate(359deg) brightness(101%) contrast(105%);"
+                    alt="Audio"> Optimizador de Audio (.OGG)</h2>
+
+            <div style="display:flex; width: 100%; gap:10px; margin-bottom: 20px;">
+                <input type="file" id="audioUpload" class="hidden-file" accept="audio/ogg, audio/mpeg, .ogg, .mp3">
+                <button class="btn-pildora"
+                    style="flex:1; padding: 15px; font-size: 1rem; background: #ffaa00; color: #000; border:none;"
+                    onclick="document.getElementById('audioUpload').click();">
+                    <img src="https://cdn-icons-png.flaticon.com/512/716/716784.png" class="icon icon-black"
+                        alt="Upload"> SELECCIONAR CANCIÓN / VOZ (.OGG / .MP3)
+                </button>
+            </div>
+
+            <div class="split-workspace" style="align-items: flex-start;">
+                <div class="psych-panel" style="flex: 1; border-color:#ffaa00;">
+                    <h3 style="color: var(--text); margin-top:0;">Nivel de Compresión</h3>
+                    <p style="font-size: 0.8rem; color:#aaa;">Elige qué tanto deseas exprimir el archivo. El motor usará
+                        codificación Vorbis nativa para FNF.</p>
+
+                    <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
+                        <label class="inner-glass-box"
+                            style="cursor:pointer; display:flex; align-items:center; gap:10px;">
+                            <input type="radio" name="oggQuality" value="128k" checked
+                                style="accent-color: #ffaa00; scale:1.3;">
+                            <div>
+                                <b style="color:var(--text);">Optimizado</b>
+                                <div style="font-size:0.75rem; color:var(--text-muted);">Baja el peso a la mitad.
+                                    Conserva excelente
+                                    calidad. (128 kbps)</div>
+                            </div>
+                        </label>
+
+                        <label class="inner-glass-box"
+                            style="cursor:pointer; display:flex; align-items:center; gap:10px;">
+                            <input type="radio" name="oggQuality" value="80k" style="accent-color: #ffaa00; scale:1.3;">
+                            <div>
+                                <b style="color:var(--text);">Equilibrado</b>
+                                <div style="font-size:0.75rem; color:var(--text-muted);">Calidad de mod estándar, peso
+                                    muy bajo. (80
+                                    kbps)</div>
+                            </div>
+                        </label>
+
+                        <label class="inner-glass-box"
+                            style="cursor:pointer; display:flex; align-items:center; gap:10px;">
+                            <input type="radio" name="oggQuality" value="48k" style="accent-color: #ffaa00; scale:1.3;">
+                            <div>
+                                <b style="color:var(--text);">Máximo (Exprimido)</b>
+                                <div style="font-size:0.75rem; color:var(--text-muted);">La calidad disminuye, pero el
+                                    peso es
+                                    mínimo. (48 kbps)</div>
+                            </div>
+                        </label>
+                    </div>
+
+                    <button class="btn-pildora" id="btnRunAudio"
+                        style="width:100%; margin-top: 20px; display:none; background: #ffaa00; color:black; border:none;"
+                        onclick="ejecutarCompresionAudio()">
+                        <img src="https://cdn-icons-png.flaticon.com/128/11252/11252744.png" class="icon icon-black"
+                            alt="Procesar"> INICIAR COMPRESIÓN OGG
+                    </button>
+
+                    <button class="btn-pildora" id="btnDownloadAudio"
+                        style="width:100%; margin-top: 20px; display:none; background: var(--accent-psych); color:black; border:none;">
+                        <img src="https://cdn-icons-png.flaticon.com/128/892/892303.png" class="icon icon-black"
+                            alt="Bajar"> DESCARGAR AUDIO OPTIMIZADO
+                    </button>
+                </div>
+
+                <div class="psych-panel" style="flex: 1; text-align: center; border-color: #ffaa00;">
+                    <h3 style="color: var(--text); margin-top:0;">Resultados del Audio</h3>
+
+                    <div style="display:flex; justify-content: space-around; margin: 20px 0;">
+                        <div>
+                            <div style="font-size: 0.8rem; color:#aaa;">Peso Original</div>
+                            <div id="txtAudioOrigSize" style="font-size: 1.5rem; font-weight:bold; color:#ff4d88;">---
+                                MB</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.8rem; color:#aaa;">Peso Optimizado</div>
+                            <div id="txtAudioNewSize"
+                                style="font-size: 1.5rem; font-weight:bold; color:var(--accent-psych);">--- MB</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.8rem; color:#aaa;">BPM (Ritmo)</div>
+                            <div id="txtAudioBPM"
+                                style="font-size: 1.5rem; font-weight:bold; color:var(--accent-gold);">---</div>
+                        </div>
+                    </div>
+
+                    <div class="inner-glass-box"
+                        style="height: 150px; display:flex; flex-direction:column; align-items:center; justify-content:center; overflow:hidden;">
+                        <img src="https://cdn-icons-png.flaticon.com/512/862/862700.png" class="icon-lg icon-black">
+                        <p style="color: var(--text-muted); font-weight:bold; font-size: 0.9rem; margin-top: 10px;">
+                            Motor FFmpeg
+                            Vorbis</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="overlay-modal" id="welcomeModal" style="display: none;">
+            <div class="modal-box">
+                <h2 class="modal-title">¡Bienvenido a Spritesheet Generator FNF!</h2>
+                <div class="modal-body">
+                    <p>La herramienta definitiva creada en la web para optimizar y crear spritesheets listos para
+                        <b>Friday
+                            Night Funkin'</b>. Esto es lo que puedes hacer aquí:
+                    </p>
+
+                    <ul class="modal-list">
+                        <li><img src="https://cdn-icons-png.flaticon.com/128/10301/10301595.png" class="icon-sm">
+                            <b>Escanear de Cero:</b> Sube un PNG en la web y fusionará, recortará las cajas de tus
+                            dibujos
+                            automáticamente sin dejar fragmentos sin usar.
+                        </li>
+                        <li><img src="https://cdn-icons-png.flaticon.com/512/1041/1041985.png" class="icon-sm">
+                            <b>Optimizador:</b> Sube tu XML y tu PNG. El sistema se encargará de darte una imagen más
+                            optimizada con su XML modificado.
+                        </li>
+                        <li><img src="https://cdn-icons-png.flaticon.com/512/126/126472.png" class="icon-sm">
+                            <b>Laboratorio
+                                de Offsets:</b> Ajusta posiciones, escala, duplica frames, renombra en masa y visualiza
+                            cómo
+                            lucirá cada animación.
+                        </li>
+                        <li><img src="https://cdn-icons-png.flaticon.com/512/3135/3135692.png" class="icon-sm"> <b>Psych
+                                Live Editor:</b> Crea el archivo JSON de tu personaje alineando posiciones, barra de
+                            vida y
+                            la cámara en tiempo real.</li>
+                        <li><img src="https://cdn-icons-png.flaticon.com/512/8208/8208316.png" class="icon-sm"> <b
+                                style="color:#b57cff;">Compresor PNG Pro:</b> Sube tu imagen PNG y la herramienta bajará
+                            su
+                            peso drásticamente conservando su resolución.</li>
+                        <li><img src="https://cdn-icons-png.flaticon.com/512/862/862700.png" class="icon-sm"> <b
+                                style="color:#ffaa00;">Compresor Audio OGG:</b> Reduce el tamaño de tus voces e
+                            instrumentales en segundos.</li>
+                    </ul>
+                </div>
+                <button class="btn-pildora btn-modal-action" onclick="closeWelcomeModal()">¡Comenzar a Crear!</button>
+            </div>
+        </div>
+
+        <div class="overlay-modal" id="changelogModal" style="display: none;">
+            <div class="modal-box modal-box-changelog">
+                <h2 class="modal-title" style="color: var(--accent-gold);">¡Novedades en la Versión 1.3! ✨</h2>
+                <div class="modal-body">
+                    <p>El proyecto se ha actualizado. Aquí tienes los últimos cambios implementados v1.3:</p>
+                    <ul class="modal-list">
+                        <li><b><span style="color: #ffaa00;">[NUEVO]</span> Compresor Audio OGG:</b> Ya puedes bajar el
+                            peso
+                            de tus Instrumentales y Voces sin instalar nada, directamente en la página con motor FFmpeg.
+                        </li>
+                        <li><b><span style="color: #b57cff;">[NUEVO]</span> Compresor PNG:</b> Ahora puedes optimizar el
+                            peso en MB de tus PNG directamente en el navegador, sin usar páginas externas.</li>
+                        <li><b><span style="color: var(--accent-gold);">[NUEVO]</span> Compresión ZIP Inteligente:</b>
+                            Al
+                            optimizar, se descargará un archivo .ZIP conteniendo tu nuevo PNG y el XML listo para
+                            usarse.
+                        </li>
+                        <li><b><span style="color: var(--accent);">[NUEVO]</span> Conversor Animate Atlas:</b> Este
+                            escaner
+                            realiza uan funcion
+                            para tener todos los prites en .PNG y .XML.</li>
+                        <li><b><span style="color: var(--accent);">[NUEVO]</span> Correccion de Errores:</b>Se
+                            solucionaron
+                            varios errores,
+                            y agregando nuevas funciones utiles.</li>
+                    </ul>
+                </div>
+                <button class="btn-pildora btn-modal-action"
+                    style="background: linear-gradient(135deg, #b38f00, #665200); border-color: var(--accent-gold);"
+                    onclick="closeChangelogModal()">¡Entendido!</button>
+            </div>
+        </div>
+
+        <!-- MODAL HISTORIAL -->
+        <div class="overlay-modal" id="historyModal" style="display:none;">
+            <div class="modal-box">
+                <h2 class="modal-title"><img src="https://cdn-icons-png.flaticon.com/128/2088/2088617.png"
+                        style="width:30px; filter:brightness(0) invert(1);"> Sesión Anterior</h2>
+                <div class="modal-body" id="historyModalContent">
+                </div>
+                <button class="btn-pildora btn-secundario" style="width:100%; margin-top:20px;"
+                    onclick="closeHistoryModal()">Cancelar</button>
+            </div>
+        </div>
+
+        <!-- MODAL: WARNING JSON FALTANTE -->
+        <div class="overlay-modal" id="modalJsonWarning" style="display:none; z-index: 10001;">
+            <div class="modal-box ia-box" style="max-width: 450px; text-align:center;">
+                <div class="modal-header">
+                    <h2><img src="https://cdn-icons-png.flaticon.com/128/1828/1828843.png" class="icon-lg"
+                            style="margin-bottom:0;" alt="Warning"> Advertencia</h2>
+                </div>
+                <div class="modal-body" style="color:var(--text);">
+                    <p>Se ha reducido el tamaño de la imagen, pero <b>no importaste ningún archivo .JSON</b> para
+                        corregir las coordenadas.</p>
+                    <p>Si exportas ahora, la imagen y el XML estarán bien, pero las animaciones dentro del juego podrían
+                        verse desalineadas (offset incorrecto).</p>
+                    <p style="margin-top:20px; font-weight:bold;">¿Deseas continuar la exportación sin el JSON?</p>
+                </div>
+                <div class="modal-footer" style="display:flex; gap:10px; justify-content:center; margin-top:20px;">
+                    <button class="btn-pildora btn-secundario" style="flex:1;"
+                        onclick="resolverModalJsonWarning(false)">Regresar</button>
+                    <button class="btn-pildora btn-export" style="flex:1;" onclick="resolverModalJsonWarning(true)">Sí,
+                        continuar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- FAB WRAPPER: MODO OSCURO -->
+        <div class="fab-wrap-dark">
+            <button class="fab-btn darkmode-btn" onclick="toggleDarkMode()" title="Modo Oscuro/Claro">
+                <img src="https://cdn-icons-png.flaticon.com/128/11885/11885172.png" id="darkModeIcon"
+                    class="icon-sm icon-black" alt="Dark Mode">
+            </button>
+        </div>
+
+        <!-- FAB WRAPPER: HISTORIAL -->
+        <div class="fab-wrap-history">
+            <button class="fab-btn history-btn" onclick="showHistoryModal()" title="Historial / Autoguardado"
+                style="background: rgba(255,170,0,0.6);">
+                <img src="https://cdn-icons-png.flaticon.com/128/2088/2088617.png" class="icon-sm icon-black"
+                    alt="History">
+            </button>
+        </div>
+
+        <!-- FAB WRAPPER: TEMA -->
+        <div class="fab-wrap-theme">
+            <button class="fab-btn theme-btn" onclick="toggleThemeMenu()" title="Cambiar Tema">
+                <img src="https://cdn-icons-png.flaticon.com/128/893/893322.png" class="icon-sm icon-black" alt="Theme">
+            </button>
+            <div class="fab-menu" id="fabThemeMenu">
+                <button class="fab-item" onclick="changeTheme('cyberpunk'); toggleThemeMenu();">
+                    <span class="fab-color-dot" style="background: #f1a9d4;"></span> Pastel (Predeterminado)
+                </button>
+                <button class="fab-item" onclick="changeTheme('psych'); toggleThemeMenu();">
+                    <span class="fab-color-dot" style="background: #aaff00;"></span> Tema Psych
+                </button>
+                <button class="fab-item" onclick="changeTheme('bf'); toggleThemeMenu();">
+                    <span class="fab-color-dot" style="background: #31b0d1;"></span> Tema BF
+                </button>
+            </div>
+        </div>
+
+        <script src="js/history.js?v=2"></script>
+        <script src="js/main.js?v=2" defer></script>
+        <script src="js/audio.js?v=2" defer></script>
+
+        <script>
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                    navigator.serviceWorker.register('sw.js')
+                        .then(reg => console.log('¡Web App lista y registrada!', reg.scope))
+                        .catch(err => console.error('Error al registrar Web App:', err));
+                });
+            }
+        </script>
+        <script>window.addEventListener("DOMContentLoaded", () => { appMode = "AUDIO"; if (typeof toggleNavButtons === "function") toggleNavButtons(); if (typeof openWindow === "function") openWindow("win-audio"); });</script>
+</body>
+
+</html>
