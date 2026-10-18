@@ -152,13 +152,21 @@
 </head>
 
 <body>
-    <!-- SISTEMA DE CARGA GLOBAL -->
+    <!-- SISTEMA DE CARGA GLOBAL CON CONTEO DE PORCENTAJE E IA -->
     <div id="globalLoader" class="global-loader">
-        <div class="loader-content">
-            <div class="ia-spinner"></div>
+        <div class="loader-content" style="max-width: 380px; padding: 25px 22px; background: rgba(15, 15, 28, 0.96); border: 1px solid rgba(0, 229, 255, 0.35); border-radius: 16px; box-shadow: 0 10px 45px rgba(0,0,0,0.85); text-align: center;">
+            <div class="ia-spinner" style="margin: 0 auto;"></div>
+            <div id="loaderPercent" style="font-size: 2.3rem; font-weight: 900; color: #00ff88; text-shadow: 0 0 20px rgba(0,255,136,0.6); margin-top: 14px; letter-spacing: 1px;">0%</div>
+            <div class="loader-bar-bg" style="width: 100%; height: 9px; background: rgba(255,255,255,0.12); border-radius: 5px; overflow: hidden; margin: 12px 0 14px 0;">
+                <div id="loaderBarFill" style="width: 0%; height: 100%; background: linear-gradient(90deg, #00e5ff, #00ff88); transition: width 0.25s ease;"></div>
+            </div>
             <p id="globalLoaderText"
-                style="color: white; font-weight: bold; margin-top: 15px; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
-                Iniciando...</p>
+                style="color: white; font-weight: 800; font-size: 1.02rem; margin: 0; text-shadow: 0 2px 4px rgba(0,0,0,0.6); line-height: 1.4;">
+                Subiendo imagen...
+            </p>
+            <div id="globalLoaderSubtext" style="color: #00e5ff; font-size: 0.78rem; margin-top: 6px; line-height: 1.35;">
+                Iniciando motor de compresión inteligente...
+            </div>
         </div>
     </div>
 
@@ -328,17 +336,54 @@
                                 </select>
                             </div>
 
-                            <!-- Quality selector -->
-                            <div class="form-row">
-                                <label for="selQuality">
-                                    <span>⚡</span> Calidad de Codificación Arm astcenc:
+                            <!-- 3 Botones de Calidad de Codificación Arm astcenc solicitados -->
+                            <div class="form-row" style="background: rgba(255, 255, 255, 0.03); padding: 14px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.1);">
+                                <label style="margin-bottom: 10px; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 8px;">
+                                    <span>⚡</span> Calidad de Codificación y Modo de Limpieza:
                                 </label>
-                                <select id="selQuality">
-                                    <option value="thorough" selected>Exhaustivo (Thorough - Recomendado Arm: Elimina rellenos, distorsión y ruido en bordes)</option>
-                                    <option value="exhaustive">Exhaustive (100% Búsqueda exhaustiva máxima de particiones)</option>
-                                    <option value="medium">Equilibrado (Medium - Proceso más veloz)</option>
-                                    <option value="fast">Rápido (Fast - Solo borradores rápidos)</option>
-                                </select>
+                                
+                                <input type="hidden" id="selQuality" value="framebyframe">
+
+                                <div style="display: flex; gap: 10px; flex-direction: column;">
+                                    <!-- Botón 1: Normal -->
+                                    <button type="button" class="mode-select-btn" id="btnModeNormal"
+                                        style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.02); color: #ccc; cursor: pointer; text-align: left; transition: all 0.2s ease;">
+                                        <div style="display: flex; align-items: center; gap: 12px;">
+                                            <span style="font-size: 1.4rem;">🟢</span>
+                                            <div>
+                                                <div style="font-weight: 800; font-size: 0.9rem; color: #fff;">1. Compresión Normal (Directa / Rápida)</div>
+                                                <div style="font-size: 0.75rem; color: #888;">Compresión estándar y rápida sin pasadas adicionales de análisis, ideal si la imagen ya no tiene residuos.</div>
+                                            </div>
+                                        </div>
+                                        <span class="mode-badge" id="badgeModeNormal" style="display:none; color: #00ff88; font-weight: 900; font-size: 1.1rem;">✓</span>
+                                    </button>
+
+                                    <!-- Botón 2: Frame por Frame (Recomendado) -->
+                                    <button type="button" class="mode-select-btn active-mode" id="btnModeFrameByFrame"
+                                        style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-radius: 8px; border: 1px solid #00e5ff; background: rgba(0, 229, 255, 0.1); color: #fff; cursor: pointer; text-align: left; transition: all 0.2s ease; box-shadow: 0 0 15px rgba(0,229,255,0.15);">
+                                        <div style="display: flex; align-items: center; gap: 12px;">
+                                            <span style="font-size: 1.4rem;">🟡</span>
+                                            <div>
+                                                <div style="font-weight: 800; font-size: 0.9rem; color: #00e5ff;">2. Optimización Inteligente Frame por Frame (Recomendado)</div>
+                                                <div style="font-size: 0.75rem; color: #ccc;">Chequea frame por frame si hay XML importado para purgar halos feos, o revisa la imagen completa varias veces para eliminar cualquier residuo.</div>
+                                            </div>
+                                        </div>
+                                        <span class="mode-badge" id="badgeModeFrameByFrame" style="display:inline; color: #00ff88; font-weight: 900; font-size: 1.1rem;">✓</span>
+                                    </button>
+
+                                    <!-- Botón 3: Avanzado IA Profunda -->
+                                    <button type="button" class="mode-select-btn" id="btnModeAdvancedAi"
+                                        style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.02); color: #ccc; cursor: pointer; text-align: left; transition: all 0.2s ease;">
+                                        <div style="display: flex; align-items: center; gap: 12px;">
+                                            <span style="font-size: 1.4rem;">🟣</span>
+                                            <div>
+                                                <div style="font-weight: 800; font-size: 0.9rem; color: #b57cff;">3. Análisis Avanzado con IA Profunda (Ultra Purificación)</div>
+                                                <div style="font-size: 0.75rem; color: #888;">La página piensa más, analiza toda la imagen a fondo con escaneo multi-pasada, extingue halos blancos/morados y busca el menor error posible (1-2 min).</div>
+                                            </div>
+                                        </div>
+                                        <span class="mode-badge" id="badgeModeAdvancedAi" style="display:none; color: #b57cff; font-weight: 900; font-size: 1.1rem;">✓</span>
+                                    </button>
+                                </div>
                             </div>
 
                             <!-- Limpieza de Alpha y Sangrado de Bordes -->
@@ -439,7 +484,38 @@
                         </div>
                     </div>
 
+                    <!-- Vista Previa de la Textura ASTC Generada -->
+                    <div style="background: rgba(0, 0, 0, 0.45); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px;">
+                            <div style="font-weight: 800; color: #fff; font-size: 0.92rem; display: flex; align-items: center; gap: 8px;">
+                                <span>👁️</span> Vista Previa Real de la Textura ASTC Decodificada:
+                            </div>
+                            <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                                <span style="font-size: 0.75rem; color: #aaa;">Fondo de prueba:</span>
+                                <button type="button" class="btn-res-bg active" id="btnBgGrid" style="padding: 4px 10px; font-size: 0.74rem; border-radius: 6px; border: 1px solid #00e5ff; background: rgba(0,229,255,0.18); color: #00e5ff; cursor: pointer;">🏁 Ajedrez</button>
+                                <button type="button" class="btn-res-bg" id="btnBgBlack" style="padding: 4px 10px; font-size: 0.74rem; border-radius: 6px; border: 1px solid #444; background: #000; color: #ccc; cursor: pointer;">⬛ Negro</button>
+                                <button type="button" class="btn-res-bg" id="btnBgWhite" style="padding: 4px 10px; font-size: 0.74rem; border-radius: 6px; border: 1px solid #444; background: #fff; color: #111; cursor: pointer;">⬜ Blanco</button>
+                                <button type="button" class="btn-res-bg" id="btnBgPurple" style="padding: 4px 10px; font-size: 0.74rem; border-radius: 6px; border: 1px solid #b57cff; background: #260a3a; color: #b57cff; cursor: pointer;">🟪 Púrpura FNF</button>
+                            </div>
+                        </div>
+
+                        <div id="resPreviewContainer" style="background: repeating-conic-gradient(#333 0% 25%, transparent 0% 50%) 50% / 16px 16px; border-radius: 8px; padding: 12px; display: flex; justify-content: center; align-items: center; min-height: 220px; max-height: 380px; overflow: auto; border: 1px solid rgba(255,255,255,0.08); transition: background 0.2s ease;">
+                            <canvas id="resAstcPreviewCanvas" style="max-width: 100%; max-height: 360px; object-fit: contain; box-shadow: 0 4px 25px rgba(0,0,0,0.6); border-radius: 6px; display: block; margin: 0 auto;"></canvas>
+                        </div>
+                        <div style="font-size: 0.74rem; color: #aaa; margin-top: 8px; text-align: center;">
+                            Esta es la imagen exacta de la textura decodificada por WebAssembly tal como la leerá la GPU de tu teléfono en el juego.
+                        </div>
+                    </div>
+
+                    <!-- Caja de Logs / Diagnóstico de Auditoría IA -->
+                    <div id="aiAuditLogBox" style="display: none; background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(0, 229, 255, 0.3); border-radius: 10px; padding: 14px 18px; margin-bottom: 20px; text-align: left; font-family: monospace; font-size: 0.82rem; line-height: 1.6;"></div>
+
+                    <!-- Botones de Acción: Reintentar IA + Descargar -->
                     <div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap; margin-top:15px;">
+                        <button type="button" class="btn-pildora" id="btnReprocessAi"
+                            style="background: rgba(181, 124, 255, 0.12); color: #b57cff; border: 1px solid #b57cff; font-weight: 800; padding: 14px 22px; font-size: 0.95rem; cursor: pointer; transition: all 0.2s ease;">
+                            🔁 Reintentar / Repasar con IA Profunda
+                        </button>
                         <button class="btn-pildora" id="btnDownloadAstc"
                             style="background: linear-gradient(135deg, #00e5ff, #00ff88); color: black; font-weight: 800; padding: 14px 28px; border: none; font-size: 1.05rem; cursor: pointer; box-shadow: 0 4px 15px rgba(0, 229, 255, 0.4);">
                             <img src="https://cdn-icons-png.flaticon.com/512/2874/2874091.png" class="icon icon-black" alt="Download">

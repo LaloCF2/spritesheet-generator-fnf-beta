@@ -206,21 +206,13 @@
     }
 
     /**
-     * Aplica limpieza de ruido de alpha y sangrado de color en los contornos (Color Bleed / Edge Extrusion).
-     * Elimina por completo los halos distorsionados y rellenos blancos/morados alrededor de los personajes
-     * al comprimir a texturas ASTC.
+     * Purificador Inteligente Anti-Halos y Limpiador de Fondos Frame por Frame.
+     * Elimina por completo los halos morados y blancos dejados por Flash/Photoshop
+     * detectando colores de escenario, umbralizando residuos y aplicando sangrado de color activo.
      */
-    /**
-     * Aplica limpieza de ruido de alpha y sangrado de color en los contornos (Color Bleed / Edge Extrusion).
-     * Elimina por completo los halos distorsionados y rellenos blancos/morados alrededor de los personajes
-     * al comprimir a texturas ASTC.
-     * 
-     * Implementa los principios del manual oficial de Arm ASTC Encoder:
-     * - Clampea residuos o polvo invisible (alpha <= 4) dejado por Flash/Photoshop a 0 absoluto.
-     * - Expande en 5 pasadas el color exacto del personaje hacia los píxeles transparentes adyacentes (alpha = 0).
-     * - Limpia los píxeles de fondo transparente lejano a (0,0,0,0) para bloques constantes de coste nulo.
-     */
-    function applyColorBleedAndCleanAlpha(canvas, passes = 5) {
+    function purifyCanvas(canvas, options = {}) {
+        const mode = options.mode || 'framebyframe';
+        const xmlFrames = options.xmlFrames || (options.xmlData && options.xmlData.frames) || null;
         const width = canvas.width;
         const height = canvas.height;
         const ctx = canvas.getContext('2d');
@@ -228,25 +220,164 @@
         const data = imgData.data;
         const totalPixels = width * height;
 
-        // Paso 1: Clampear a 0 cualquier ruido o polvo invisible (alpha <= 4)
+        // Umbrales según el modo seleccionado
+        let alphaThreshold = 8;
+        let chromaTolerance = 65;
+        let bleedPasses = 4;
+
+        if (mode === 'normal') {
+            alphaThreshold = 6;
+            bleedPasses = 3;
+            chromaTolerance = 50;
+        } else if (mode === 'framebyframe') {
+            alphaThreshold = 18; // Purgar feathering tenue y bordes
+            bleedPasses = 5;
+            chromaTolerance = 80;
+        } else if (mode === 'advanced') {
+            alphaThreshold = 26; // Ultra-purificación para eliminar auras y cajas densas
+            bleedPasses = 6;
+            chromaTolerance = 95;
+        }
+
+        // 1. Detección Inteligente del Color de Escenario / Fondo (Flash Stage Chroma)
+        let sampleR = 0, sampleG = 0, sampleB = 0, sampleCount = 0;
+        let whiteCount = 0, purpleCount = 0;
+
+        // Muestrear píxeles de bajo alpha (halo / antialiasing de escenario) y bordes de la imagen
+        const step = Math.max(1, Math.floor(data.length / (4 * 2500)));
+        for (let i = 0; i < data.length; i += step * 4) {
+            const a = data[i + 3];
+            if (a > 0 && a <= 65) {
+                const r = data[i], g = data[i + 1], b = data[i + 2];
+                sampleR += r;
+                sampleG += g;
+                sampleB += b;
+                sampleCount++;
+                if (r > 200 && g > 200 && b > 200) whiteCount++;
+                if (r > 60 && b > 80 && g < Math.max(r, b)) purpleCount++;
+            }
+        }
+
+        const bgR = sampleCount > 0 ? Math.round(sampleR / sampleCount) : 255;
+        const bgG = sampleCount > 0 ? Math.round(sampleG / sampleCount) : 255;
+        const bgB = sampleCount > 0 ? Math.round(sampleB / sampleCount) : 255;
+
+        // 2. Si hay XML, marcar máscara de área útil y purgar todo lo que esté fuera de los fotogramas
+        let inFrameMask = null;
+        if (xmlFrames && Array.isArray(xmlFrames) && xmlFrames.length > 0) {
+            inFrameMask = new Uint8Array(totalPixels);
+            for (let f of xmlFrames) {
+                const fx = Math.max(0, Math.min(width - 1, f.x));
+                const fy = Math.max(0, Math.min(height - 1, f.y));
+                const fw = Math.min(width - fx, Math.max(0, f.w));
+                const fh = Math.min(height - fy, Math.max(0, f.h));
+
+                for (let y = fy; y < fy + fh; y++) {
+                    const row = y * width;
+                    for (let x = fx; x < fx + fw; x++) {
+                        inFrameMask[row + x] = 1;
+                    }
+                }
+            }
+        }
+
+        // 3. Purificación: eliminar polvo, feathering y color de escenario coincidente
         const isOpaque = new Uint8Array(totalPixels);
         const rCopy = new Uint8Array(totalPixels);
         const gCopy = new Uint8Array(totalPixels);
         const bCopy = new Uint8Array(totalPixels);
 
         for (let i = 0, p = 0; i < data.length; i += 4, p++) {
-            if (data[i + 3] <= 4) {
+            // Si hay XML y el píxel está fuera de TODOS los frames, purgar a 0 absoluto inmediatamente
+            if (inFrameMask && inFrameMask[p] === 0) {
+                data[i] = 0;
+                data[i + 1] = 0;
+                data[i + 2] = 0;
+                data[i + 3] = 0;
+                isOpaque[p] = 0;
+                continue;
+            }
+
+            const a = data[i + 3];
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+
+            // Distancia de color al fondo de escenario detectado
+            const distBg = sampleCount > 0 ? Math.sqrt((r - bgR) ** 2 + (g - bgG) ** 2 + (b - bgB) ** 2) : 999;
+            // También comprobar blanco puro / gris de Flash (#FFFFFF / #EEEEEE)
+            const distWhite = Math.sqrt((r - 255) ** 2 + (g - 255) ** 2 + (b - 255) ** 2);
+            // Púrpura típico de escenario Flash FNF
+            const distPurple = Math.sqrt((r - 120) ** 2 + (g - 40) ** 2 + (b - 160) ** 2);
+            const isPurpleStage = (r > 60 && b > 80 && g < Math.max(r, b) * 0.75);
+
+            let isResidue = false;
+            if (a <= alphaThreshold) {
+                isResidue = true;
+            } else if (a <= 50 && (distBg <= chromaTolerance || distWhite <= 70 || distPurple <= 75 || isPurpleStage)) {
+                isResidue = true;
+            } else if (mode === 'advanced' && a <= 75 && (distBg <= chromaTolerance * 1.25 || distWhite <= 85 || distPurple <= 90 || isPurpleStage)) {
+                isResidue = true;
+            }
+
+            if (isResidue) {
+                data[i] = 0;
+                data[i + 1] = 0;
+                data[i + 2] = 0;
                 data[i + 3] = 0;
                 isOpaque[p] = 0;
             } else {
                 isOpaque[p] = 1;
-                rCopy[p] = data[i];
-                gCopy[p] = data[i + 1];
-                bCopy[p] = data[i + 2];
+                rCopy[p] = r;
+                gCopy[p] = g;
+                bCopy[p] = b;
             }
         }
 
-        // Paso 2: Sangrado de color ultrarrápido basado en frontera activa (Frontier BFS)
+        // 4. De-fringing: desintoxicar bordes semi-transparentes
+        if (mode !== 'normal') {
+            for (let y = 0; y < height; y++) {
+                const row = y * width;
+                for (let x = 0; x < width; x++) {
+                    const p = row + x;
+                    const p4 = p * 4;
+                    const a = data[p4 + 3];
+                    if (a > 0 && a < 180) {
+                        const distBg = Math.sqrt((data[p4] - bgR) ** 2 + (data[p4 + 1] - bgG) ** 2 + (data[p4 + 2] - bgB) ** 2);
+                        const distWhite = Math.sqrt((data[p4] - 255) ** 2 + (data[p4 + 1] - 255) ** 2 + (data[p4 + 2] - 255) ** 2);
+                        if (distBg < 70 || distWhite < 60) {
+                            let bestR = data[p4], bestG = data[p4 + 1], bestB = data[p4 + 2], found = false;
+                            for (let dy = -2; dy <= 2 && !found; dy++) {
+                                const ny = y + dy;
+                                if (ny < 0 || ny >= height) continue;
+                                const nRow = ny * width;
+                                for (let dx = -2; dx <= 2 && !found; dx++) {
+                                    const nx = x + dx;
+                                    if (nx < 0 || nx >= width) continue;
+                                    const np4 = (nRow + nx) * 4;
+                                    if (data[np4 + 3] > 220) {
+                                        bestR = data[np4];
+                                        bestG = data[np4 + 1];
+                                        bestB = data[np4 + 2];
+                                        found = true;
+                                    }
+                                }
+                            }
+                            if (found) {
+                                data[p4] = bestR;
+                                data[p4 + 1] = bestG;
+                                data[p4 + 2] = bestB;
+                                rCopy[p] = bestR;
+                                gCopy[p] = bestG;
+                                bCopy[p] = bestB;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 5. Sangrado de color activo (Alpha Dilation BFS)
         let frontier = [];
         for (let y = 0; y < height; y++) {
             const row = y * width;
@@ -264,8 +395,7 @@
         }
 
         const dilatedPixels = new Uint8Array(totalPixels);
-
-        for (let pass = 0; pass < passes && frontier.length > 0; pass++) {
+        for (let pass = 0; pass < bleedPasses && frontier.length > 0; pass++) {
             const nextFrontier = [];
 
             for (let k = 0; k < frontier.length; k++) {
@@ -306,19 +436,16 @@
                     data[p4] = newR;
                     data[p4 + 1] = newG;
                     data[p4 + 2] = newB;
-                    // data[p4 + 3] permanece estrictamente en 0 (100% transparente)
 
                     dilatedPixels[p] = 1;
                 }
             }
 
-            // Marcar píxeles de frontera como llenos para la siguiente iteración
             for (let k = 0; k < frontier.length; k++) {
                 isOpaque[frontier[k]] = 1;
             }
 
-            // Buscar la siguiente frontera si quedan pasadas
-            if (pass < passes - 1) {
+            if (pass < bleedPasses - 1) {
                 for (let k = 0; k < frontier.length; k++) {
                     const p = frontier[k];
                     const x = p % width;
@@ -333,7 +460,7 @@
                     for (let n = 0; n < neighbors.length; n++) {
                         const np = neighbors[n];
                         if (isOpaque[np] === 0) {
-                            isOpaque[np] = 2; // Marcador temporal para no duplicar en nextFrontier
+                            isOpaque[np] = 2;
                             nextFrontier.push(np);
                         }
                     }
@@ -346,8 +473,7 @@
             }
         }
 
-        // Paso 3: Para las zonas transparentes lejanas (fondo libre), poner RGB a 0
-        // Esto permite que el compresor ASTC genere void-extent blocks (bloques constantes) de 0 error.
+        // 6. Fondo distante a (0, 0, 0, 0) para bloques constantes en ASTC
         for (let i = 0, p = 0; i < data.length; i += 4, p++) {
             if (data[i + 3] === 0 && dilatedPixels[p] === 0) {
                 data[i] = 0;
@@ -357,18 +483,66 @@
         }
 
         ctx.putImageData(imgData, 0, 0);
+        return { bgR, bgG, bgB, alphaThreshold, bleedPasses };
+    }
+
+    /**
+     * Auditoría de Textura ASTC decodificada:
+     * Inspecciona los píxeles decodificados para comprobar si quedaron residuos o halos.
+     */
+    function auditTexture(canvas, xmlFrames) {
+        const width = canvas.width;
+        const height = canvas.height;
+        const ctx = canvas.getContext('2d');
+        const imgData = ctx.getImageData(0, 0, width, height);
+        const data = imgData.data;
+
+        let residualCount = 0;
+        let suspiciousHalos = 0;
+
+        for (let i = 0; i < data.length; i += 4) {
+            const a = data[i + 3];
+            if (a > 0 && a <= 25) {
+                residualCount++;
+            } else if (a > 25 && a <= 60) {
+                const r = data[i], g = data[i + 1], b = data[i + 2];
+                if ((r > 230 && g > 230 && b > 230) || (r > 100 && b > 140 && g < 80)) {
+                    suspiciousHalos++;
+                }
+            }
+        }
+
+        const hasFlaws = (residualCount > 400 || suspiciousHalos > 120);
+        return {
+            hasFlaws,
+            residualCount,
+            suspiciousHalos,
+            totalEvaluated: width * height
+        };
+    }
+
+    function applyColorBleedAndCleanAlpha(canvas, passes = 5) {
+        return purifyCanvas(canvas, { mode: 'framebyframe', bleedPasses: passes });
     }
 
     async function encodeCanvasToAstc(canvas, options = {}) {
         const blockX = options.blockX || 6;
         const blockY = options.blockY || 6;
-        const qualityName = (options.quality || 'medium').toLowerCase();
+        const mode = options.mode || 'framebyframe';
+        let qualityName = (options.quality || '').toLowerCase();
+        if (!qualityName) {
+            if (mode === 'normal') qualityName = 'fast';
+            else if (mode === 'framebyframe') qualityName = 'thorough';
+            else if (mode === 'advanced') qualityName = 'exhaustive';
+            else qualityName = 'thorough';
+        }
+
         const flipY = options.flipY !== undefined ? options.flipY : false; // Por defecto false (orientación normal derecha)
         let quality = 60;
         if (qualityName === 'fastest') quality = 0;
-        else if (qualityName === 'fast') quality = 10;
+        else if (qualityName === 'fast') quality = 25;
         else if (qualityName === 'medium') quality = 60;
-        else if (qualityName === 'thorough') quality = 98;
+        else if (qualityName === 'thorough') quality = 95;
         else if (qualityName === 'exhaustive') quality = 100;
 
         // Crear lienzo independiente para no modificar el original
@@ -384,10 +558,15 @@
             sCtx.drawImage(flipped, 0, 0);
         }
 
-        // Aplicar sangrado de color y limpieza de alpha por defecto (evita halos blancos/morados)
+        // Aplicar sangrado de color y purificación inteligente según el modo y XML
         const bleedAlpha = options.bleedAlpha !== undefined ? options.bleedAlpha : true;
+        let purifyReport = null;
         if (bleedAlpha) {
-            applyColorBleedAndCleanAlpha(sourceCanvas);
+            purifyReport = purifyCanvas(sourceCanvas, {
+                mode: mode,
+                xmlFrames: options.xmlFrames || null,
+                bleedPasses: mode === 'advanced' ? 8 : (mode === 'normal' ? 3 : 5)
+            });
         }
 
         const width = sourceCanvas.width;
@@ -461,7 +640,8 @@
             blockY,
             bpp: (128 / (blockX * blockY)).toFixed(2),
             payloadLength: payload.length,
-            totalLength: astcBytes.length
+            totalLength: astcBytes.length,
+            purifyReport
         };
     }
 
@@ -473,6 +653,8 @@
         flipCanvasVertical,
         flipCanvasHorizontal,
         applyColorBleedAndCleanAlpha,
+        purifyCanvas,
+        auditTexture,
         initDecoderSync,
         bppForBlock: (bx, by) => (128 / (bx * by)).toFixed(2),
         BLOCK_PRESETS: [
