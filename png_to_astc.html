@@ -270,23 +270,27 @@
                         </div>
 
                         <div class="options-group">
-                            <!-- Presets de Optimización Rápida -->
+                            <!-- Presets de Optimización Rápida Basados en Guía Oficial Arm ASTC -->
                             <div style="background: rgba(255, 255, 255, 0.03); padding: 12px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.08);">
                                 <div style="font-size: 0.78rem; color: #aaa; margin-bottom: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">
-                                    ⚡ Presets Rápidos de Peso Mínimo:
+                                    ⚡ Presets Oficiales Arm ASTC (Sin distorsión en bordes):
                                 </div>
                                 <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                                     <button type="button" class="btn-pildora" id="btnPresetStandard"
                                         style="padding: 7px 14px; font-size: 0.82rem; border-color: #00e5ff; color: #00e5ff; background: rgba(0,229,255,0.08); cursor: pointer;">
-                                        ⭐ 100% Escala (-64% peso · 10×10)
+                                        ⭐ Estándar Psych Mobile (100% Escala · 6×6)
                                     </button>
                                     <button type="button" class="btn-pildora" id="btnPresetReduced"
                                         style="padding: 7px 14px; font-size: 0.82rem; border-color: #b57cff; color: #b57cff; background: rgba(181,124,255,0.08); cursor: pointer;">
-                                        🚀 Máximo Ahorro 100% (-75% peso · 12×12)
+                                        🚀 Ahorro Balanceado (-44% peso · 8×8)
                                     </button>
                                     <button type="button" class="btn-pildora" id="btnPresetUltraLight"
                                         style="padding: 7px 14px; font-size: 0.82rem; border-color: #00ff88; color: #00ff88; background: rgba(0,255,136,0.12); font-weight: 800; cursor: pointer;">
-                                        ⚡ Peso Mínimo (80 KB - 300 KB)
+                                        ⚡ Ultra Ahorro (80 KB - 300 KB · Escala 50% + 8×8)
+                                    </button>
+                                    <button type="button" class="btn-pildora" id="btnPresetPristine"
+                                        style="padding: 7px 14px; font-size: 0.82rem; border-color: #ffd700; color: #ffd700; background: rgba(255,215,0,0.08); cursor: pointer;">
+                                        💎 Máxima Fidelidad (100% Escala · 5×5)
                                     </button>
                                 </div>
                             </div>
@@ -300,7 +304,7 @@
                                     <option value="1.0" selected>100% - Resolución Original (Máxima Nitidez · Mismas dimensiones del XML)</option>
                                     <option value="0.85">85% - Ligera Reducción (Ahorra ~28% de peso adicional)</option>
                                     <option value="0.75">75% - Reducción Equilibrada (Ahorra ~44% de peso adicional)</option>
-                                    <option value="0.50">50% - Media Resolución 0.5x (¡Ahorra 75% de peso adicional! Para 80 KB - 300 KB)</option>
+                                    <option value="0.50">50% - Media Resolución 0.5x (Consejo Arm: Ultra Ahorro de 80 KB - 300 KB sin distorsión)</option>
                                     <option value="0.35">35% - Ultra Compacto (Ahorra ~88% de peso)</option>
                                     <option value="0.25">25% - Extremo Móvil (Ahorra ~94% de peso)</option>
                                 </select>
@@ -312,38 +316,39 @@
                             <!-- Block size selector -->
                             <div class="form-row">
                                 <label for="selBlockSize">
-                                    <span>🧱</span> Tamaño de Bloque (Footprint):
+                                    <span>🧱</span> Tamaño de Bloque (Footprint Arm):
                                 </label>
                                 <select id="selBlockSize">
-                                    <option value="10x10" selected>10×10 (1.28 bpp - Ultra Ligero Recomendado: ¡Pesa mucho menos que el PNG!)</option>
-                                    <option value="12x12">12×12 (0.89 bpp - Peso Mínimo Absoluto: -75% peso nativo)</option>
-                                    <option value="8x8">8×8 (2.00 bpp - Equilibrado: -44% peso)</option>
-                                    <option value="6x6">6×6 (3.56 bpp - Estándar Psych Mobile)</option>
-                                    <option value="5x5">5×5 (5.12 bpp - Calidad Muy Alta)</option>
-                                    <option value="4x4">4×4 (8.00 bpp - Calidad Máxima Cruda)</option>
+                                    <option value="6x6" selected>6×6 (3.56 bpp - Estándar Psych Mobile Oficial · ~445 KB por 1024x1024)</option>
+                                    <option value="8x8">8×8 (2.00 bpp - Ahorro Balanceado Arm: -44% peso vs 6×6 · ~250 KB)</option>
+                                    <option value="5x5">5×5 (5.12 bpp - Calidad Alta Arm para personajes principales · ~640 KB)</option>
+                                    <option value="4x4">4×4 (8.00 bpp - Fidelidad Máxima Cruda · ~1.00 MB)</option>
+                                    <option value="10x10">10×10 (1.28 bpp - Ultra Ligero Arm: Fondos / Efectos de partículas · ~160 KB)</option>
+                                    <option value="12x12">12×12 (0.89 bpp - Peso Mínimo: Fondos estáticos · ~111 KB)</option>
                                 </select>
                             </div>
 
                             <!-- Quality selector -->
                             <div class="form-row">
                                 <label for="selQuality">
-                                    <span>⚡</span> Calidad de Codificación:
+                                    <span>⚡</span> Calidad de Codificación Arm astcenc:
                                 </label>
                                 <select id="selQuality">
-                                    <option value="fast" selected>Rápido (Menor uso de CPU, proceso veloz)</option>
-                                    <option value="medium">Equilibrado (Excelente fidelidad visual)</option>
-                                    <option value="thorough">Exhaustivo (Máxima calidad cromática, proceso más lento)</option>
+                                    <option value="thorough" selected>Exhaustivo (Thorough - Recomendado Arm: Elimina rellenos, distorsión y ruido en bordes)</option>
+                                    <option value="exhaustive">Exhaustive (100% Búsqueda exhaustiva máxima de particiones)</option>
+                                    <option value="medium">Equilibrado (Medium - Proceso más veloz)</option>
+                                    <option value="fast">Rápido (Fast - Solo borradores rápidos)</option>
                                 </select>
                             </div>
 
-                            <!-- Limpieza de Alpha Transparente -->
-                            <div class="form-row" style="background: rgba(255, 255, 255, 0.03); padding: 10px 14px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.1);">
+                            <!-- Limpieza de Alpha y Sangrado de Bordes -->
+                            <div class="form-row" style="background: rgba(0, 229, 255, 0.05); padding: 12px 14px; border-radius: 8px; border: 1px solid rgba(0, 229, 255, 0.25);">
                                 <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; margin: 0; font-size: 0.88rem; color: white;">
                                     <input type="checkbox" id="chkCleanAlpha" checked style="accent-color: var(--accent); width: 18px; height: 18px; cursor: pointer;">
-                                    <span>🧹 <b>Limpiar píxeles transparentes (Optimiza compresión y evita ruido)</b></span>
+                                    <span>🧹 <b>Limpieza Inteligente de Alpha y Sangrado de Bordes (Color Bleeding Arm)</b></span>
                                 </label>
-                                <span style="font-size: 0.74rem; color: #aaa; margin-left: 26px; line-height: 1.3;">
-                                    Pone a cero los colores invisibles de fondo, permitiendo que el codificador ASTC genere bloques ultraligeros sin pérdida visible.
+                                <span style="font-size: 0.74rem; color: #ccc; margin-left: 26px; line-height: 1.35; display:block; margin-top: 4px;">
+                                    Elimina el polvo residual invisible (alpha &le; 4) y extiende el color de los bordes del personaje hacia los píxeles transparentes adyacentes con ponderación alfa oficial de Arm (<code>ASTCENC_FLG_USE_ALPHA_WEIGHT</code>). <b>Evita al 100% los rellenos glitcheados blancos o morados alrededor del personaje en el juego.</b>
                                 </span>
                             </div>
 

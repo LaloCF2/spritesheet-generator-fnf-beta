@@ -249,7 +249,15 @@
                                 </button>
                                 <button type="button" class="btn-pildora" id="btnPresetAstcBal"
                                     style="padding: 6px 12px; font-size: 0.78rem; border-color: #00e5ff; color: #00e5ff; background: rgba(0,229,255,0.1); cursor: pointer;">
-                                    ⚖️ Equilibrado (8×8)
+                                    ⭐ Estándar (6×6)
+                                </button>
+                                <button type="button" class="btn-pildora" id="btnPresetAstcUltra"
+                                    style="padding: 6px 12px; font-size: 0.78rem; border-color: #00ff88; color: #00ff88; background: rgba(0,255,136,0.1); cursor: pointer;">
+                                    🚀 Balanceado (8×8)
+                                </button>
+                                <button type="button" class="btn-pildora" id="btnPresetAstcMax"
+                                    style="padding: 6px 12px; font-size: 0.78rem; border-color: #b57cff; color: #b57cff; background: rgba(181,124,255,0.1); cursor: pointer;">
+                                    ⚡ Máximo Ahorro (12×12)
                                 </button>
                             </div>
                         </div>
@@ -257,36 +265,37 @@
                         <!-- Selector de Bloque -->
                         <div class="panel-rango">
                             <label for="selAstcTargetBlock">
-                                <span>🧱</span> Tamaño de Bloque Objetivo:
+                                <span>🧱</span> Tamaño de Bloque Objetivo (Arm astcenc):
                             </label>
                             <select id="selAstcTargetBlock">
-                                <option value="12x12" selected>12×12 (0.89 bpp - Peso Mínimo Absoluto: ¡Reduce hasta -75% a -88%!)</option>
-                                <option value="10x10">10×10 (1.28 bpp - Ultra Ligero Recomendado: ¡Reduce hasta -64% a -84%!)</option>
-                                <option value="8x8">8×8 (2.00 bpp - Gran Ahorro Equilibrado: -44% a -75%)</option>
-                                <option value="6x6">6×6 (3.56 bpp - Estándar Oficial FNF Mobile)</option>
+                                <option value="6x6" selected>6×6 (3.56 bpp - Estándar Psych Mobile Oficial Recomendado)</option>
+                                <option value="8x8">8×8 (2.00 bpp - Ahorro Balanceado Arm: -44% peso sin pérdida)</option>
+                                <option value="10x10">10×10 (1.28 bpp - Ultra Ligero para fondos/efectos)</option>
+                                <option value="12x12">12×12 (0.89 bpp - Peso Mínimo Absoluto: Fondos estáticos)</option>
                             </select>
                         </div>
 
                         <!-- Calidad -->
                         <div class="panel-rango">
                             <label for="selAstcQuality">
-                                <span>⚡</span> Calidad de Codificación:
+                                <span>⚡</span> Calidad de Codificación Arm astcenc:
                             </label>
                             <select id="selAstcQuality">
-                                <option value="fast" selected>Rápido (Proceso veloz, menor uso de CPU)</option>
-                                <option value="medium">Equilibrado (Excelente fidelidad visual)</option>
-                                <option value="thorough">Exhaustivo (Máxima calidad cromática)</option>
+                                <option value="thorough" selected>Exhaustivo (Thorough - Recomendado Arm: Elimina artefactos en bordes)</option>
+                                <option value="exhaustive">Exhaustive (100% Búsqueda exhaustiva máxima)</option>
+                                <option value="medium">Equilibrado (Medium - Proceso más veloz)</option>
+                                <option value="fast">Rápido (Fast - Borradores rápidos)</option>
                             </select>
                         </div>
 
-                        <!-- Limpieza de Alpha -->
-                        <div style="background: rgba(255, 255, 255, 0.03); padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.1); margin-bottom: 16px;">
+                        <!-- Limpieza de Alpha y Sangrado de Bordes -->
+                        <div style="background: rgba(0, 229, 255, 0.05); padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(0, 229, 255, 0.25); margin-bottom: 16px;">
                             <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; margin: 0; font-size: 0.85rem; color: white;">
-                                <input type="checkbox" id="chkCleanAlphaAstc" checked style="accent-color: #b57cff; width: 17px; height: 17px; cursor: pointer;">
-                                <span>🧹 <b>Limpieza de píxeles transparentes</b></span>
+                                <input type="checkbox" id="chkCleanAlphaAstc" checked style="accent-color: #00e5ff; width: 17px; height: 17px; cursor: pointer;">
+                                <span>🧹 <b>Limpieza de Alpha y Sangrado de Bordes (Color Bleeding)</b></span>
                             </label>
-                            <span style="font-size: 0.72rem; color: #aaa; margin-left: 25px; display: block; margin-top: 3px;">
-                                Elimina colores residuales en zonas 100% invisibles para que el compresor no gaste memoria en el fondo.
+                            <span style="font-size: 0.72rem; color: #ccc; margin-left: 25px; display: block; margin-top: 3px;">
+                                Elimina residuos invisibles de alpha (&le; 4) y extiende el color del contorno hacia píxeles adyacentes para que el motor del juego nunca dibuje rellenos distorsionados.
                             </span>
                         </div>
 

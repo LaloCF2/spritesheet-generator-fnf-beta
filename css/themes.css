@@ -1,0 +1,142 @@
+/* ==========================================
+   VARIABLES GLOBALES (GLASSMORPHISM)
+========================================== */
+:root {
+    /* Fondos Pastel */
+    --bg-1: #ffb6c1;
+    --bg-2: #ffc0cb;
+    --bg-3: #dda0dd;
+    --bg-4: #add8e6;
+
+    /* Cristal */
+    --glass-bg: rgba(255, 255, 255, 0.25);
+    --glass-border: rgba(255, 255, 255, 0.5);
+    --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+
+    /* Textos */
+    --text: #333333;
+    --text-muted: #666666;
+
+    /* Acentos Vivos para botones */
+    --accent: #6c5ce7;
+    --accent-pink: #ff4757;
+    --accent-psych: #2ed573;
+    --accent-gold: #ffa502;
+
+    /* Fondo Ventanas */
+    --window-bg: rgba(255, 255, 255, 0.35);
+    --panel: rgba(255, 255, 255, 0.45);
+    --panel-light: rgba(255, 255, 255, 0.6);
+}
+
+/* ==========================================
+   MODO OSCURO (DARK GLASS)
+========================================== */
+body.dark-mode {
+    --glass-bg: rgba(0, 0, 0, 0.35);
+    --glass-border: rgba(255, 255, 255, 0.15);
+    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+
+    --text: #ffffff;
+    --text-muted: #cccccc;
+
+    --window-bg: rgba(0, 0, 0, 0.45);
+    --panel: rgba(0, 0, 0, 0.55);
+    --panel-light: rgba(0, 0, 0, 0.65);
+
+    background-color: #05060f;
+    color: #ffffff;
+}
+
+body.dark-mode .glass-bg {
+    background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+}
+
+body.dark-mode .btn-secundario {
+    background: rgba(0, 0, 0, 0.4);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+body.dark-mode .btn-secundario:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+body.dark-mode .fab-btn,
+body.dark-mode .fab-item {
+    background: rgba(0, 0, 0, 0.6);
+    border-color: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+body.dark-mode .fab-btn:hover,
+body.dark-mode .fab-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+body.dark-mode .icon-black {
+    filter: brightness(0) invert(1) !important;
+}
+
+body.dark-mode .modal-box,
+body.dark-mode .ia-box {
+    background: rgba(10, 10, 15, 0.85);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+body.dark-mode .modal-list li {
+    background: rgba(0, 0, 0, 0.5);
+    border-color: rgba(255, 255, 255, 0.1);
+    border-left-color: var(--accent);
+}
+
+body.dark-mode .form-group input,
+body.dark-mode .form-group select,
+body.dark-mode .inner-glass-box,
+body.dark-mode .batch-bar input[type="text"],
+body.dark-mode .batch-bar select,
+body.dark-mode .panel-rango input[type="range"] {
+    background: rgba(0, 0, 0, 0.6);
+    border-color: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+body.dark-mode h1,
+body.dark-mode h2,
+body.dark-mode h3,
+body.dark-mode p,
+body.dark-mode span,
+body.dark-mode label,
+body.dark-mode .home-title,
+body.dark-mode .home-desc {
+    color: var(--text);
+}
+
+/* ==========================================
+   TEMAS EXTRA (SI ES NECESARIO MANTENERLOS)
+========================================== */
+body.theme-psych .glass-bg {
+    background: linear-gradient(135deg, #e0ffcd, #fdffcd);
+}
+
+body.theme-psych {
+    --bg-1: #b612fd;
+    --bg-2: #aaff00;
+    --bg-3: #55ff00;
+    --bg-4: #d687fc;
+    --accent: #b612fd;
+    --accent-pink: #ff96a6;
+}
+
+body.theme-bf .glass-bg {
+    background: linear-gradient(135deg, #d4fc79, #96e6a1);
+}
+
+body.theme-bf {
+    --bg-1: #31B0D1;
+    --bg-2: #1e6d82;
+    --bg-3: #4df0ff;
+    --bg-4: #EE1536;
+    --accent: #31B0D1;
+    --accent-pink: #EE1536;
+}
+

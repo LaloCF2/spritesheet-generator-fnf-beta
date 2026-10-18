@@ -1,0 +1,310 @@
+/* ==========================================
+   RESET UNIVERSAL
+========================================== */
+*, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+
+html {
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+}
+
+body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+    -webkit-text-size-adjust: 100%;
+}
+
+/* ==========================================
+   FONDO ANIMADO (BLOBS)
+========================================== */
+.glass-bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: -1;
+    overflow: hidden;
+    background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
+}
+
+.glass-blob {
+    position: absolute;
+    filter: blur(80px);
+    border-radius: 50%;
+    animation: floatBlob 20s infinite alternate ease-in-out;
+    opacity: 0.8;
+}
+
+.blob-1 {
+    width: 50vw;
+    height: 50vw;
+    background: var(--bg-1);
+    top: -10%;
+    left: -10%;
+    animation-delay: 0s;
+}
+
+.blob-2 {
+    width: 40vw;
+    height: 40vw;
+    background: var(--bg-3);
+    bottom: -10%;
+    right: -10%;
+    animation-delay: -5s;
+}
+
+.blob-3 {
+    width: 60vw;
+    height: 60vw;
+    background: var(--bg-4);
+    top: 20%;
+    right: -20%;
+    animation-delay: -10s;
+}
+
+.blob-4 {
+    width: 45vw;
+    height: 45vw;
+    background: var(--bg-2);
+    bottom: 10%;
+    left: 20%;
+    animation-delay: -15s;
+}
+
+@keyframes floatBlob {
+    0% {
+        transform: translate(0, 0) scale(1);
+    }
+
+    50% {
+        transform: translate(10%, 15%) scale(1.1);
+    }
+
+    100% {
+        transform: translate(-10%, -10%) scale(0.9);
+    }
+}
+
+/* ==========================================
+   SISTEMA DE ICONOS
+========================================== */
+.icon {
+    width: 1.2rem;
+    height: 1.2rem;
+    vertical-align: text-bottom;
+    margin-right: 6px;
+}
+
+.logo-icon {
+    filter: drop-shadow(0 0 5px var(--accent));
+    width: 1.6rem;
+    height: 1.6rem;
+}
+
+.icon-sm {
+    width: 0.9rem;
+    height: 0.9rem;
+    vertical-align: middle;
+    margin: 0;
+}
+
+.icon-lg {
+    width: 4rem;
+    height: 4rem;
+    vertical-align: middle;
+    filter: drop-shadow(0 10px 10px rgba(0, 0, 0, 0.1));
+    margin-bottom: 15px;
+}
+
+.icon-white {
+    filter: brightness(0) invert(1) !important;
+}
+
+.icon-black {
+    filter: brightness(0) !important;
+}
+
+.icon-no-margin {
+    margin-right: 0 !important;
+}
+
+/* ==========================================
+   HEADER Y GESTOR DE VENTANAS
+========================================== */
+.app-header {
+    width: 100%;
+    background: var(--glass-bg);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border-bottom: 1px solid var(--glass-border);
+    padding: 10px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    z-index: 10;
+    box-shadow: var(--glass-shadow);
+}
+
+.app-title {
+    color: var(--text);
+    font-size: 1.4rem;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    font-weight: 900;
+    letter-spacing: 1px;
+}
+
+.window-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    width: 100%;
+    max-width: 1200px;
+}
+
+.win-btn {
+    background: var(--panel-light);
+    color: var(--text-muted);
+    border: 1px solid var(--glass-border);
+    padding: 8px 12px;
+    border-radius: 12px;
+    font-weight: bold;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1 1 14%;
+    justify-content: center;
+    min-width: 120px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.win-btn:hover {
+    background: rgba(255, 255, 255, 0.8);
+    color: var(--text);
+    transform: translateY(-2px);
+}
+
+.win-btn.active {
+    background: white;
+    color: var(--accent);
+    border-color: white;
+    box-shadow: 0 8px 20px rgba(108, 92, 231, 0.2);
+    transform: translateY(-2px);
+}
+
+.win-btn.psych-mode {
+    color: var(--accent-psych);
+}
+
+.win-btn.psych-mode.active {
+    color: var(--accent-psych);
+    box-shadow: 0 8px 20px rgba(46, 213, 115, 0.2);
+}
+
+.btn-export {
+    background: linear-gradient(135deg, #00cec9, #00b894);
+    color: white;
+    border: none;
+}
+
+.btn-export:hover {
+    filter: brightness(1.1);
+    color: white;
+}
+
+.btn-pack {
+    background: linear-gradient(135deg, #fdcb6e, #e17055);
+    color: white;
+    border: none;
+}
+
+.btn-pack:hover {
+    filter: brightness(1.1);
+    color: white;
+}
+
+/* ==========================================
+   ESPACIO DE TRABAJO PRINCIPAL (WORKSPACE)
+========================================== */
+.main-workspace {
+    width: 100%;
+    flex: 1;
+    padding: 20px 20px 100px 20px;
+    overflow-y: auto;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+.window-content {
+    display: none;
+    width: 100%;
+    max-width: 1200px;
+    background: var(--window-bg);
+    backdrop-filter: blur(25px);
+    -webkit-backdrop-filter: blur(25px);
+    border: 1px solid var(--glass-border);
+    border-radius: 24px;
+    padding: 25px;
+    box-shadow: var(--glass-shadow);
+    flex-direction: column;
+    gap: 15px;
+    animation: fadeIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.window-content.active {
+    display: flex;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.98);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@media (max-width: 768px) {
+    .main-workspace {
+        padding: 12px 8px 90px 8px;
+    }
+
+    .window-content {
+        padding: 16px 12px;
+        border-radius: 18px;
+        gap: 12px;
+    }
+}
+
+@media (max-width: 480px) {
+    .main-workspace {
+        padding: 8px 4px 85px 4px;
+    }
+
+    .window-content {
+        padding: 12px 8px;
+        border-radius: 14px;
+        gap: 10px;
+    }
+}
+
+/* ==========================================
