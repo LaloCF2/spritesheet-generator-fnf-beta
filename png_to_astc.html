@@ -263,6 +263,29 @@
                             alt="XML">
                         <span id="lblXmlBtn">2. Subir Archivo .XML (Base de frames)</span>
                     </button>
+
+                    <input type="file" id="jsonFileInput" class="hidden-file" accept="*/*,.json">
+                    <button class="btn-pildora btn-secundario" id="btnUploadJson"
+                        style="border-color:#b57cff; color:#b57cff; padding: 12px 24px; font-size: 0.95rem; cursor: pointer;"
+                        title="Opcional: el .json del personaje (Psych Engine). Si reduces la escala se ajustan automáticamente la escala, la posición y la cámara."
+                        onclick="document.getElementById('jsonFileInput').click();">
+                        <span style="font-size:1.1rem;">🧍</span>
+                        <span id="lblJsonBtn">3. Subir .JSON del personaje (opcional)</span>
+                    </button>
+                </div>
+
+                <!-- Badge JSON del personaje (Psych Engine) -->
+                <div id="jsonBaseBadge" style="display:none; background: rgba(181, 124, 255, 0.08); border: 1px solid rgba(181, 124, 255, 0.35); border-radius: 12px; padding: 12px 18px; margin-bottom: 18px; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span style="font-size: 1.5rem;">🧍</span>
+                        <div>
+                            <div style="font-weight: 800; color: #b57cff; font-size: 0.92rem;" id="jsonBaseTitle">JSON del personaje</div>
+                            <div style="font-size: 0.8rem; color: #ddd; line-height: 1.5;" id="jsonBaseDetails">--</div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-pildora" id="btnRemoveJson"
+                        style="padding: 6px 12px; font-size: 0.78rem; border-color: rgba(255,51,102,0.4); color: #ff5577; background: rgba(255,51,102,0.08); cursor: pointer;"
+                        title="Desvincular archivo JSON">✕ Desvincular JSON</button>
                 </div>
 
                 <!-- Badge Base XML (Se muestra al subir XML) -->
@@ -558,6 +581,10 @@
                             style="display:none; background: rgba(0, 229, 255, 0.15); color: #00e5ff; border: 1px solid #00e5ff; font-weight: 800; padding: 14px 22px; font-size: 0.95rem; cursor: pointer;">
                             📄 Descargar XML Sincronizado
                         </button>
+                        <button type="button" class="btn-pildora" id="btnDownloadJson"
+                            style="display:none; background: rgba(181, 124, 255, 0.15); color: #b57cff; border: 1px solid #b57cff; font-weight: 800; padding: 14px 22px; font-size: 0.95rem; cursor: pointer;">
+                            🧍 Descargar JSON ajustado
+                        </button>
                         <button class="btn-pildora" id="btnDownloadAstc"
                             style="background: linear-gradient(135deg, #00e5ff, #00ff88); color: black; font-weight: 800; padding: 14px 28px; border: none; font-size: 1.05rem; cursor: pointer; box-shadow: 0 4px 15px rgba(0, 229, 255, 0.4);">
                             <img src="https://cdn-icons-png.flaticon.com/512/2874/2874091.png" class="icon icon-black" alt="Download">
@@ -641,6 +668,7 @@
 
     <script src="js/history.js?v=2"></script>
     <script src="js/main.js?v=2" defer></script>
+    <script src="js/psych_json.js?v=2" defer></script>
     <script src="js/png_to_astc.js?v=2" defer></script>
     <script>
         window.addEventListener("DOMContentLoaded", () => {

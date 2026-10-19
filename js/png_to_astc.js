@@ -133,7 +133,9 @@
                 const w = parseInt(st.getAttribute('width')) || 0;
                 const h = parseInt(st.getAttribute('height')) || 0;
 
-                frames.push({ name, x, y, w, h });
+                const fw = parseInt(st.getAttribute('frameWidth')) || w;
+                const fh = parseInt(st.getAttribute('frameHeight')) || h;
+                frames.push({ name, x, y, w, h, fw, fh });
 
                 if (x < minX) minX = x;
                 if (y < minY) minY = y;
@@ -334,6 +336,7 @@
             }
         }
 
+        updateJsonBadge();
         renderPreview();
     }
 
@@ -343,8 +346,10 @@
         const inputSize = currentPngFile ? currentPngFile.size : 0;
         const targetBytes = calculateTargetBytes(inputSize);
 
-        const availableScales = [1.0, 0.85, 0.75, 0.60, 0.50, 0.40, 0.35, 0.25];
-        const availableBlocks = ['6x6', '8x8', '10x10', '12x12'];
+        // Solo bloques 6x6 / 8x8: los de 10x10 y 12x12 no tienen resolución para bordes limpios
+        // (dejan residuos alrededor del personaje). Para bajar el peso se reduce la escala (consejo de Arm).
+        const availableScales = [1.0, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55, 0.5, 0.45, 0.4, 0.35, 0.3, 0.25];
+        const availableBlocks = ['6x6', '8x8'];
 
         let bestOption = null;
         let maxQualityScore = -1;
@@ -359,7 +364,8 @@
 
                 if (plan.bytes <= targetBytes) {
                     const bpp = 128 / (bx * by);
-                    const qualityScore = s * Math.sqrt(bpp);
+                    // A igual nitidez se prefiere 6x6, que deja bordes más limpios
+                    const qualityScore = s * Math.sqrt(bpp) * (bx <= 6 ? 1.04 : 1);
                     if (qualityScore > maxQualityScore) {
                         maxQualityScore = qualityScore;
                         bestOption = { scale: s, block: b, bytes: plan.bytes };
@@ -368,11 +374,11 @@
             }
         }
 
-        // Si la textura es colosal y excede targetBytes en todas las configuraciones estándar, bajar la escala con bloque 10x10
+        // Si la textura es colosal y excede targetBytes en todas las configuraciones estándar, seguir bajando la escala con 8x8
         if (!bestOption) {
             let s = 0.25;
-            while (s > 0.15 && planOutput(s, 10, 10).bytes > targetBytes) s = Math.round((s - 0.01) * 100) / 100;
-            bestOption = { scale: s, block: '10x10', bytes: planOutput(s, 10, 10).bytes };
+            while (s > 0.1 && planOutput(s, 8, 8).bytes > targetBytes) s = Math.round((s - 0.01) * 100) / 100;
+            bestOption = { scale: s, block: '8x8', bytes: planOutput(s, 8, 8).bytes };
         }
 
         currentAutoTuneScale = bestOption.scale;
@@ -578,9 +584,95 @@
         });
     }
 
+    // ===== JSON del personaje (Psych Engine): escala, posición y cámara =====
+    let currentJsonFile = null;
+    let currentJsonRaw = null;
+    const jsonFileInput = document.getElementById('jsonFileInput');
+    const btnUploadJson = document.getElementById('btnUploadJson');
+    const lblJsonBtn = document.getElementById('lblJsonBtn');
+    const jsonBaseBadge = document.getElementById('jsonBaseBadge');
+    const jsonBaseTitle = document.getElementById('jsonBaseTitle');
+    const jsonBaseDetails = document.getElementById('jsonBaseDetails');
+    const btnRemoveJson = document.getElementById('btnRemoveJson');
+
+    // Fotogramas del XML en el formato que espera calcularAjustePsychJson (medidas originales)
+    function spritesForJson() {
+        if (!currentXmlData || !currentXmlData.frames) return [];
+        return currentXmlData.frames.map(f => ({
+            name: f.name, w: f.w, h: f.h,
+            frameWidth: f.fw, frameHeight: f.fh,
+            origFrameWidth: f.fw, origFrameHeight: f.fh
+        }));
+    }
+
+    // Mismo cálculo que el Optimizador: escala x(1/factor) y compensación de posición y cámara
+    function computeJsonAdjustment(scale) {
+        if (!currentJsonRaw || typeof calcularAjustePsychJson !== 'function') return null;
+        return calcularAjustePsychJson(currentJsonRaw, scale, spritesForJson());
+    }
+
+    function updateJsonBadge() {
+        if (!jsonBaseBadge) return;
+        if (!currentJsonRaw) {
+            jsonBaseBadge.style.display = 'none';
+            return;
+        }
+        jsonBaseBadge.style.display = 'flex';
+        const scale = currentImage ? getSelectedScale() : 1.0;
+        const adj = computeJsonAdjustment(scale);
+        const animCount = (currentJsonRaw.animations || []).length;
+        if (jsonBaseTitle) jsonBaseTitle.textContent = `JSON del personaje: ${currentJsonFile.name} (${animCount} animaciones)`;
+        if (!jsonBaseDetails || !adj) return;
+        if (scale >= 1.0) {
+            jsonBaseDetails.innerHTML = `Escala ${adj.origScale} · Posición [${adj.origPos.join(', ')}] · Cámara [${adj.origCamPos.join(', ')}]<br>` +
+                `<span style="color:#aaa;">Con la escala al 100% el JSON no necesita cambios.</span>`;
+            return;
+        }
+        const noXml = !currentXmlData
+            ? `<br><span style="color:#ffaa00;">⚠️ Sube el XML para calcular la posición exacta (sin él se usa un tamaño de frame estimado).</span>`
+            : '';
+        jsonBaseDetails.innerHTML =
+            `Al ${(scale * 100).toFixed(0)}%: ` +
+            `<b>Escala</b> ${adj.origScale} ➔ <b style="color:#00e5ff;">${adj.newScale}</b> · ` +
+            `<b>Posición</b> [${adj.origPos.join(', ')}] ➔ <b style="color:#00ff88;">[${adj.newPos.join(', ')}]</b> · ` +
+            `<b>Cámara</b> [${adj.origCamPos.join(', ')}] ➔ <b style="color:#ffcc00;">[${adj.newCamPos.join(', ')}]</b>` +
+            `<br><span style="color:#aaa;">Rol: ${adj.isPlayer ? 'Jugador' : 'Oponente'} · Animación base: "${adj.refAnim}" · Frame ${adj.frameSize[0]}×${adj.frameSize[1]} px</span>` +
+            noXml;
+    }
+
+    function resetJson() {
+        currentJsonFile = null;
+        currentJsonRaw = null;
+        if (jsonFileInput) jsonFileInput.value = '';
+        if (lblJsonBtn) lblJsonBtn.textContent = '3. Subir .JSON del personaje (opcional)';
+        if (typeof window.setImportButtonState === 'function' && btnUploadJson) {
+            window.setImportButtonState(btnUploadJson, 'reset');
+        }
+        updateJsonBadge();
+    }
+
+    if (jsonFileInput) {
+        jsonFileInput.addEventListener('change', async (e) => {
+            await window.validateAndProcessFile(e.target, 'json', {
+                onSuccess: (file, data) => {
+                    currentJsonFile = file;
+                    currentJsonRaw = JSON.parse(JSON.stringify(data.obj));
+                    if (lblJsonBtn) lblJsonBtn.textContent = `✓ JSON: ${file.name}`;
+                    if (typeof window.setImportButtonState === 'function') {
+                        window.setImportButtonState(btnUploadJson || e.target, 'success', { fileName: file.name });
+                    }
+                    updateJsonBadge();
+                },
+                onError: () => resetJson()
+            });
+        });
+    }
+    if (btnRemoveJson) btnRemoveJson.addEventListener('click', resetJson);
+
     // Recalcula dimensiones y peso (y el auto-ajuste si está activo) sin tocar el resto de opciones
     function refreshPlan() {
         if (!currentImage) {
+            updateJsonBadge();
             renderPreview();
             return;
         }
@@ -823,6 +915,16 @@
                     btnScaledXml.style.display = 'none';
                 }
             }
+            const btnJson = document.getElementById('btnDownloadJson');
+            if (btnJson) {
+                if (currentJsonRaw && scale < 1.0) {
+                    const adj = computeJsonAdjustment(scale);
+                    btnJson.style.display = 'inline-block';
+                    btnJson.textContent = `🧍 Descargar JSON ajustado (escala ${adj ? adj.newScale : ''})`;
+                } else {
+                    btnJson.style.display = 'none';
+                }
+            }
 
             // Actualizar tarjetas de estadísticas
             const setRes = (id, val) => {
@@ -865,6 +967,16 @@
                         </div>
                     `;
                 }
+            }
+
+            // Resultado del pulido de bordes (bloques recomprimidos para quitar residuos alrededor del personaje)
+            if (auditBox && result.repairReport && result.repairReport.revisados > 0) {
+                const rr = result.repairReport;
+                auditBox.insertAdjacentHTML('beforeend', `
+                    <div style="color:#00e5ff; font-size:0.76rem; margin-top:8px;">
+                        ✨ Pulido de bordes: ${rr.reparados} de ${rr.revisados} bloques del borde recomprimidos ·
+                        residuos alrededor del personaje: ${rr.fugasAntes.toLocaleString()} ➔ ${rr.fugasDespues.toLocaleString()} px (${rr.seg}s)
+                    </div>`);
             }
 
             hideLoader();
@@ -1078,6 +1190,28 @@
         }
     }
 
+    // El JSON solo cambia si se redujo la escala (con 100% las medidas en pantalla son idénticas)
+    function needsNewJson() {
+        return !!(currentJsonRaw && currentAstcResult && currentAstcResult.scale < 1.0);
+    }
+
+    function downloadOutputJson() {
+        const adj = computeJsonAdjustment(currentAstcResult.scale);
+        if (!adj) return;
+        downloadBlob(new Blob([JSON.stringify(adj.json, null, '\t')], { type: 'application/json' }), currentJsonFile.name);
+    }
+
+    const btnDownloadJson = document.getElementById('btnDownloadJson');
+    if (btnDownloadJson) {
+        btnDownloadJson.addEventListener('click', () => {
+            if (!needsNewJson()) {
+                alert('ℹ️ La textura está al 100% de escala, así que tu JSON original sigue siendo válido.');
+                return;
+            }
+            downloadOutputJson();
+        });
+    }
+
     // Botón para descargar el Sparrow XML nuevo (reempaquetado / escalado)
     const btnDownloadScaledXml = document.getElementById('btnDownloadScaledXml');
     if (btnDownloadScaledXml) {
@@ -1102,6 +1236,10 @@
             if (needsNewXml()) {
                 await new Promise(r => setTimeout(r, 400));
                 await downloadOutputXml();
+            }
+            if (needsNewJson()) {
+                await new Promise(r => setTimeout(r, 400));
+                downloadOutputJson();
             }
         });
     }
@@ -1141,6 +1279,13 @@
                 dt.items.add(xml);
                 xmlFileInput.files = dt.files;
                 xmlFileInput.dispatchEvent(new Event('change'));
+            }
+            const json = files.find(f => f.name.toLowerCase().endsWith('.json'));
+            if (json && jsonFileInput) {
+                const dt = new DataTransfer();
+                dt.items.add(json);
+                jsonFileInput.files = dt.files;
+                jsonFileInput.dispatchEvent(new Event('change'));
             }
         }
     });

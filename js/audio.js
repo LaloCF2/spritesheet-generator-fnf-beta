@@ -183,24 +183,33 @@ async function ejecutarCompresionAudio() {
                 }
             });
 
-            const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd';
+            // El worker de FFmpeg 0.12 se crea como módulo: ahí no existe importScripts y el núcleo
+            // se carga con import(), por lo que el núcleo DEBE ser la versión ESM (la UMD falla con
+            // "failed to import ffmpeg-core.js"). El worker sí es el UMD autocontenido (814.ffmpeg.js).
+            const coreBaseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
             const ffmpegURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd';
             try {
-                let loadPromise = window.ffmpegInstance.load({
-                    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-                    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-                    classWorkerURL: await toBlobURL(`${ffmpegURL}/814.ffmpeg.js`, 'text/javascript'),
-                });
-                
+                showLoader("MOTOR DE AUDIO", "Descargando motor FFmpeg (~31 MB, solo la primera vez)...<br><br><span style='font-size:0.8rem;color:#ffaa00;'>Puede tardar según tu conexión. ¡No cierres la página!</span>");
+                const coreURL = await toBlobURL(`${coreBaseURL}/ffmpeg-core.js`, 'text/javascript');
+                const wasmURL = await toBlobURL(`${coreBaseURL}/ffmpeg-core.wasm`, 'application/wasm');
+                const classWorkerURL = await toBlobURL(`${ffmpegURL}/814.ffmpeg.js`, 'text/javascript');
+
+                showLoader("MOTOR DE AUDIO", "Iniciando motor FFmpeg...");
+                let loadPromise = window.ffmpegInstance.load({ coreURL, wasmURL, classWorkerURL });
+
                 let timeoutPromise = new Promise((_, reject) => {
-                    setTimeout(() => reject(new Error("FFmpeg timeout")), 10000);
+                    setTimeout(() => reject(new Error("El motor tardó más de 60 segundos en iniciar.")), 60000);
                 });
-                
+
                 await Promise.race([loadPromise, timeoutPromise]);
             } catch (err) {
+                console.error("Error al cargar FFmpeg:", err);
+                if (window.ffmpegInstance) {
+                    try { window.ffmpegInstance.terminate(); } catch (e) { }
+                }
                 window.ffmpegInstance = null;
                 ocultarCargaGlobal();
-                throw new Error("⚠️ Tu navegador o celular bloquea los procesos en segundo plano para archivos locales (Error/Timeout). Intenta desde una PC.");
+                throw new Error("⚠️ No se pudo iniciar el motor de audio: " + (err && err.message ? err.message : err) + "\nRevisa tu conexión a internet (el motor se descarga la primera vez).");
             }
         }
 

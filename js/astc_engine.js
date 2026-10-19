@@ -731,6 +731,151 @@
         return c;
     }
 
+    // Decodifica un payload ASTC (sin cabecera) a RGBA con la fila 0 arriba
+    function decodePayloadUpright(payload, width, height, bx, by) {
+        const raw = astcDecodeRaw(payload, width, height, bx, by);
+        if (!DECODER_OUTPUT_FLIPPED) return raw;
+        const out = new Uint8Array(raw.length);
+        const row = width * 4;
+        for (let y = 0; y < height; y++) {
+            out.set(raw.subarray((height - 1 - y) * row, (height - y) * row), y * row);
+        }
+        return out;
+    }
+
+    // Error visual de un bloque: los residuos sobre zonas que deben ser transparentes
+    // cuentan mucho más, porque en el juego se ven como manchas alrededor del personaje.
+    function blockError(src, dec, width, x0, y0, bx, by, srcStride, srcX, srcY) {
+        let e = 0;
+        for (let j = 0; j < by; j++) {
+            for (let i = 0; i < bx; i++) {
+                const s = ((srcY + j) * srcStride + (srcX + i)) * 4;
+                const d = ((y0 + j) * width + (x0 + i)) * 4;
+                const sa = src[s + 3], da = dec[d + 3];
+                const ea = sa - da;
+                if (sa === 0) {
+                    e += da * da * 8;
+                } else {
+                    const dr = src[s] - dec[d], dg = src[s + 1] - dec[d + 1], db = src[s + 2] - dec[d + 2];
+                    e += ea * ea * 2 + (dr * dr + dg * dg + db * db) * (sa / 255) / 3;
+                }
+            }
+        }
+        return e;
+    }
+
+    /**
+     * Reparación de bordes bloque por bloque.
+     * Cada bloque ASTC se decodifica de forma independiente, así que se pueden recomprimir
+     * solo los bloques del borde que dejaron residuos (alfa fantasma alrededor del personaje),
+     * probar varias variantes con calidad máxima y quedarse con la que menos error visual deja.
+     */
+    function repairEdgeBlocks(payload, src, width, height, bx, by, encoder, baseConfig, swizzle) {
+        const t0 = performance.now();
+        const nbx = Math.ceil(width / bx);
+        const nby = Math.ceil(height / by);
+        const dec = decodePayloadUpright(payload, width, height, bx, by);
+
+        // 1. Localizar bloques con residuos o bordes dañados
+        const bad = [];
+        let leakBefore = 0;
+        for (let gy = 0; gy < nby; gy++) {
+            for (let gx = 0; gx < nbx; gx++) {
+                let leaks = 0, holes = 0, aerr = 0, n = 0;
+                for (let j = 0; j < by; j++) {
+                    const y = gy * by + j;
+                    if (y >= height) break;
+                    for (let i = 0; i < bx; i++) {
+                        const x = gx * bx + i;
+                        if (x >= width) break;
+                        const k = (y * width + x) * 4;
+                        const sa = src[k + 3], da = dec[k + 3];
+                        if (sa === 0 && da >= 6) leaks++;
+                        else if (sa === 255 && da < 230) holes++;
+                        aerr += Math.abs(sa - da);
+                        n++;
+                    }
+                }
+                leakBefore += leaks;
+                if (leaks > 0 || holes > 0 || aerr / Math.max(1, n) > 6) bad.push(gy * nbx + gx);
+            }
+        }
+        if (bad.length === 0) {
+            return { payload, report: { revisados: 0, reparados: 0, fugasAntes: 0, fugasDespues: 0, seg: 0 } };
+        }
+
+        // 2. Variantes de entrada para los bloques malos, empaquetadas en un mosaico
+        const cols = Math.ceil(Math.sqrt(bad.length));
+        const rows = Math.ceil(bad.length / cols);
+        const tw = cols * bx, th = rows * by;
+        const makeTiles = (transform) => {
+            const t = new Uint8Array(tw * th * 4);
+            bad.forEach((b, k) => {
+                const gx = b % nbx, gy = (b / nbx) | 0;
+                const tx = (k % cols) * bx, ty = ((k / cols) | 0) * by;
+                for (let j = 0; j < by; j++) {
+                    const y = Math.min(height - 1, gy * by + j);
+                    for (let i = 0; i < bx; i++) {
+                        const x = Math.min(width - 1, gx * bx + i);
+                        const s = (y * width + x) * 4, d = ((ty + j) * tw + (tx + i)) * 4;
+                        t[d] = src[s]; t[d + 1] = src[s + 1]; t[d + 2] = src[s + 2];
+                        t[d + 3] = transform ? transform(src[s + 3]) : src[s + 3];
+                    }
+                }
+            });
+            return t;
+        };
+        const variants = [
+            makeTiles(null),                                                                    // misma entrada, calidad máxima
+            makeTiles(a => (a < 96 ? 0 : a >= 200 ? 255 : Math.round((a - 96) * 255 / 104))),  // borde más definido
+            makeTiles(a => (a < 128 ? 0 : a >= 176 ? 255 : Math.round((a - 128) * 255 / 48)))  // borde muy definido
+        ];
+        const exhaustive = Object.assign({}, baseConfig, { quality: 100 });
+        const candidates = variants.map(data => {
+            const p = new Uint8Array(encoder.compressImage({ dimX: tw, dimY: th, dimZ: 1, dataType: 0, data }, exhaustive, swizzle, 1));
+            return { payload: p, dec: decodePayloadUpright(p, tw, th, bx, by) };
+        });
+
+        // 3. Elegir por bloque la mejor opción (incluida la original) comparando contra la entrada real
+        const out = new Uint8Array(payload);
+        let repaired = 0;
+        const wins = candidates.map(() => 0);
+        bad.forEach((b, k) => {
+            const gx = b % nbx, gy = (b / nbx) | 0;
+            const tx = (k % cols) * bx, ty = ((k / cols) | 0) * by;
+            const vw = Math.min(bx, width - gx * bx), vh = Math.min(by, height - gy * by);
+            let best = blockError(src, dec, width, gx * bx, gy * by, vw, vh, width, gx * bx, gy * by);
+            let bestCand = -1;
+            candidates.forEach((c, ci) => {
+                const e = blockError(src, c.dec, tw, tx, ty, vw, vh, width, gx * bx, gy * by);
+                if (e < best) { best = e; bestCand = ci; }
+            });
+            if (bestCand >= 0) {
+                out.set(candidates[bestCand].payload.subarray(k * 16, k * 16 + 16), b * 16);
+                wins[bestCand]++;
+                repaired++;
+            }
+        });
+
+        // 4. Medir el resultado final
+        const dec2 = decodePayloadUpright(out, width, height, bx, by);
+        let leakAfter = 0;
+        for (let k = 0; k < src.length; k += 4) {
+            if (src[k + 3] === 0 && dec2[k + 3] >= 6) leakAfter++;
+        }
+        return {
+            payload: out,
+            report: {
+                revisados: bad.length,
+                reparados: repaired,
+                fugasAntes: leakBefore,
+                fugasDespues: leakAfter,
+                ganadores: wins.join("/"),
+                seg: +((performance.now() - t0) / 1000).toFixed(1)
+            }
+        };
+    }
+
     async function encodeCanvasToAstc(canvas, options = {}) {
         const blockX = options.blockX || 6;
         const blockY = options.blockY || 6;
@@ -816,7 +961,15 @@
 
         const hasThreading = typeof SharedArrayBuffer !== 'undefined' && typeof Atomics !== 'undefined';
         const threads = hasThreading ? Math.max(1, (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) || 2) : 1;
-        const payload = encoder.compressImage(rawImage, rawConfig, rawSwizzle, threads);
+        let payload = new Uint8Array(encoder.compressImage(rawImage, rawConfig, rawSwizzle, threads));
+
+        // Pulido de bordes: recomprime los bloques que dejaron residuos alrededor del personaje
+        let repairReport = null;
+        if (options.repair !== false) {
+            const fixed = repairEdgeBlocks(payload, rgba, width, height, blockX, blockY, encoder, rawConfig, rawSwizzle);
+            payload = fixed.payload;
+            repairReport = fixed.report;
+        }
 
         // Generar cabecera oficial de 16 bytes
         const header = new Uint8Array(16);
@@ -850,7 +1003,9 @@
             bpp: (128 / (blockX * blockY)).toFixed(2),
             payloadLength: payload.length,
             totalLength: astcBytes.length,
-            purifyReport
+            purifyReport,
+            repairReport,
+            sourceCanvas
         };
     }
 
