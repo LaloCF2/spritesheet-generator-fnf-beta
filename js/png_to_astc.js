@@ -18,6 +18,8 @@
     let currentXmlFile = null;
     let currentXmlData = null;
     let currentAstcResult = null;
+    let currentAutoTuneScale = 0.50;
+    let currentAutoTuneBlock = '8x8';
 
     // DOM Elements
     const pngFileInput = document.getElementById('pngFileInput');
@@ -71,7 +73,35 @@
 
     function getSelectedScale() {
         if (!selTextureScale) return 1.0;
+        if (selTextureScale.value === 'auto') {
+            return currentAutoTuneScale || 0.50;
+        }
         return parseFloat(selTextureScale.value) || 1.0;
+    }
+
+    const chkRepackAtlas = document.getElementById('chkRepackAtlas');
+
+    function isRepackActive() {
+        return !!(currentXmlData && currentXmlData.frames && currentXmlData.frames.length > 0 &&
+            chkRepackAtlas && chkRepackAtlas.checked);
+    }
+
+    // Calcula las dimensiones REALES de la textura de salida para una escala y bloque dados.
+    // Con XML + reempaquetado, el atlas se reconstruye sin espacio vacío ni recortes repetidos.
+    function planOutput(scale, bx, by) {
+        const origW = currentImage.naturalWidth || currentImage.width;
+        const origH = currentImage.naturalHeight || currentImage.height;
+        let width, height, pack = null;
+        if (isRepackActive()) {
+            pack = window.ASTCEngine.packAtlas(currentXmlData.frames, { scale, blockX: bx, blockY: by });
+            width = pack.width;
+            height = pack.height;
+        } else {
+            width = Math.max(4, Math.round(origW * scale));
+            height = Math.max(4, Math.round(origH * scale));
+        }
+        const blocks = Math.ceil(width / bx) * Math.ceil(height / by);
+        return { width, height, pack, scale, bx, by, blocks, bytes: blocks * 16 + 16 };
     }
 
     function parseXmlSparrow(xmlDocOrText) {
@@ -207,20 +237,41 @@
         }
     }
 
+    // Calcula el tamaño objetivo en bytes según el peso del PNG original para optimizar al máximo
+    // Cumple estrictamente con la regla proporcional:
+    // - Si pesa ~1 MB -> Reducir a KB (320 KB - 550 KB)
+    // - Si pesa ~2 MB -> Cerca de 1 MB (650 KB - 880 KB)
+    // - Si pesa 5 MB o más -> Estrictamente <= 880 KB (siempre < 1.0 MB)
+    function calculateTargetBytes(inputPngSizeBytes) {
+        if (!inputPngSizeBytes || inputPngSizeBytes <= 0) {
+            return 850 * 1024;
+        }
+        const mb = inputPngSizeBytes / (1024 * 1024);
+        if (mb <= 1.2) {
+            return Math.min(550 * 1024, Math.max(320 * 1024, Math.round(inputPngSizeBytes * 0.45)));
+        } else if (mb <= 2.8) {
+            return Math.min(880 * 1024, Math.max(650 * 1024, Math.round(inputPngSizeBytes * 0.38)));
+        } else {
+            return 880 * 1024; // Siempre < 1 MB garantizado para 3 MB, 5 MB o más
+        }
+    }
+
     function updateEstimates() {
         if (!currentImage) return;
 
         const origW = currentImage.naturalWidth || currentImage.width;
         const origH = currentImage.naturalHeight || currentImage.height;
+        const isAuto = selTextureScale && selTextureScale.value === 'auto';
         const scale = getSelectedScale();
-        const targetW = Math.max(4, Math.round(origW * scale));
-        const targetH = Math.max(4, Math.round(origH * scale));
         const { bx, by } = getSelectedBlock();
+        const plan = planOutput(scale, bx, by);
+        const targetW = plan.width;
+        const targetH = plan.height;
 
         const blocksX = Math.ceil(targetW / bx);
         const blocksY = Math.ceil(targetH / by);
         const totalBlocks = blocksX * blocksY;
-        const estimatedAstcBytes = totalBlocks * 16 + 16; // 16 bytes cabecera + 16 bytes por bloque ASTC
+        const estimatedAstcBytes = plan.bytes; // 16 bytes cabecera + 16 bytes por bloque ASTC
         const bpp = (128 / (bx * by)).toFixed(2);
 
         // VRAM uncompressed RGBA vs ASTC en memoria GPU Android
@@ -232,7 +283,9 @@
             if (el) el.textContent = val;
         };
 
-        if (scale === 1.0) {
+        if (plan.pack) {
+            setTxt('lblSourceRes', `${targetW} × ${targetH} px (reempaquetado)`);
+        } else if (scale === 1.0) {
             setTxt('lblSourceRes', `${origW} × ${origH} px`);
         } else {
             setTxt('lblSourceRes', `${targetW} × ${targetH} px (-${((1 - scale) * 100).toFixed(0)}%)`);
@@ -240,10 +293,15 @@
 
         const scaleDetails = document.getElementById('lblScaleDetails');
         if (scaleDetails) {
-            if (scale === 1.0) {
+            if (plan.pack) {
+                const usedPct = ((targetW * targetH) / (origW * origH * scale * scale) * 100).toFixed(0);
+                scaleDetails.textContent = `📦 Atlas reempaquetado: ${targetW} × ${targetH} px (escala ${(scale * 100).toFixed(0)}% · ${plan.pack.uniqueCount} recortes únicos de ${currentXmlData.count} frames · ${usedPct}% del área original). Se generará un XML nuevo.`;
+            } else if (isAuto) {
+                scaleDetails.textContent = `⚡ Auto-Ajuste Inteligente Móvil: ${targetW} × ${targetH} px (Escala ${(scale * 100).toFixed(0)}% · Bloque ${bx}×${by} · Garantiza < 1 MB)`;
+            } else if (scale === 1.0) {
                 scaleDetails.textContent = `Resolución 1:1 original: ${origW} × ${origH} px (100% fiel a las coordenadas del XML)`;
             } else {
-                scaleDetails.textContent = `Resolución escalada: ${targetW} × ${targetH} px (Original: ${origW} × ${origH} px)`;
+                scaleDetails.textContent = `Resolución escalada: ${targetW} × ${targetH} px (Original: ${origW} × ${origH} px · ${(scale * 100).toFixed(0)}%)`;
             }
         }
 
@@ -252,14 +310,13 @@
         setTxt('lblTotalBlocks', `${totalBlocks} (${blocksX} × ${blocksY})`);
         setTxt('lblRamSavings', `-${vramSavingsPercent}% en VRAM`);
 
-        // Alerta inteligente de textura grande (> 1.8 MB en escala 1:1)
+        // Alerta inteligente si la textura supera 1.2 MB
         const boxAlert = document.getElementById('boxLargeTextureAlert');
         const txtAlertOrig = document.getElementById('txtAlertOrigWeight');
-        const raw100Bytes = (Math.ceil(origW / 6) * Math.ceil(origH / 6)) * 16 + 16;
         if (boxAlert && txtAlertOrig) {
-            if (raw100Bytes > 1.8 * 1024 * 1024 && estimatedAstcBytes > 1.2 * 1024 * 1024) {
+            if (!isAuto && estimatedAstcBytes > 1.2 * 1024 * 1024) {
                 boxAlert.style.display = 'flex';
-                txtAlertOrig.textContent = formatBytes(raw100Bytes);
+                txtAlertOrig.textContent = formatBytes(estimatedAstcBytes);
             } else {
                 boxAlert.style.display = 'none';
             }
@@ -280,49 +337,56 @@
         renderPreview();
     }
 
-    // Auto-Ajuste inteligente para que el archivo pese estrictamente < 1 MB en Android
-    function autoTuneForMobile() {
+    // Auto-Ajuste inteligente que optimiza al máximo y garantiza que el archivo pese proporcionalmente < 1 MB
+    function autoTuneForMobile(opts = {}) {
         if (!currentImage) return;
-        const origW = currentImage.naturalWidth || currentImage.width;
-        const origH = currentImage.naturalHeight || currentImage.height;
+        const inputSize = currentPngFile ? currentPngFile.size : 0;
+        const targetBytes = calculateTargetBytes(inputSize);
 
-        // Meta: Que pese entre 350 KB y 950 KB (estrictamente menos de 1 MB)
-        const targetBytes = 900 * 1024; // 900 KB
-        const availableScales = [1.0, 0.85, 0.75, 0.50, 0.35, 0.25];
+        const availableScales = [1.0, 0.85, 0.75, 0.60, 0.50, 0.40, 0.35, 0.25];
         const availableBlocks = ['6x6', '8x8', '10x10', '12x12'];
 
-        let bestScale = '0.50';
-        let bestBlock = '8x8';
-        let found = false;
+        let bestOption = null;
+        let maxQualityScore = -1;
 
-        // Buscar la combinación con mejor nitidez que cumpla <= targetBytes
+        // Evaluar todas las combinaciones (con el atlas reempaquetado si hay XML) y elegir
+        // la que ofrezca la mayor nitidez visual dentro del límite de peso
         for (let s of availableScales) {
             for (let b of availableBlocks) {
                 const parts = b.split('x').map(Number);
                 const bx = parts[0], by = parts[1];
-                const tw = Math.max(4, Math.round(origW * s));
-                const th = Math.max(4, Math.round(origH * s));
-                const bytes = (Math.ceil(tw / bx) * Math.ceil(th / by)) * 16 + 16;
-                if (bytes <= targetBytes) {
-                    bestScale = (s === 1.0) ? '1.0' : s.toFixed(2);
-                    bestBlock = b;
-                    found = true;
-                    break;
+                const plan = planOutput(s, bx, by);
+
+                if (plan.bytes <= targetBytes) {
+                    const bpp = 128 / (bx * by);
+                    const qualityScore = s * Math.sqrt(bpp);
+                    if (qualityScore > maxQualityScore) {
+                        maxQualityScore = qualityScore;
+                        bestOption = { scale: s, block: b, bytes: plan.bytes };
+                    }
                 }
             }
-            if (found) break;
         }
 
-        if (!found) {
-            bestScale = '0.25';
-            bestBlock = '10x10';
+        // Si la textura es colosal y excede targetBytes en todas las configuraciones estándar, bajar la escala con bloque 10x10
+        if (!bestOption) {
+            let s = 0.25;
+            while (s > 0.15 && planOutput(s, 10, 10).bytes > targetBytes) s = Math.round((s - 0.01) * 100) / 100;
+            bestOption = { scale: s, block: '10x10', bytes: planOutput(s, 10, 10).bytes };
         }
 
-        if (selTextureScale) selTextureScale.value = bestScale;
-        if (selBlockSize) selBlockSize.value = bestBlock;
-        setQualityMode('framebyframe');
-        if (chkCleanAlpha) chkCleanAlpha.checked = true;
-        if (chkFlipY) chkFlipY.checked = false;
+        currentAutoTuneScale = bestOption.scale;
+        currentAutoTuneBlock = bestOption.block;
+
+        if (selTextureScale && selTextureScale.value === 'auto') {
+            if (selBlockSize) selBlockSize.value = currentAutoTuneBlock;
+        }
+
+        if (!opts.keepSettings) {
+            setQualityMode('framebyframe');
+            if (chkCleanAlpha) chkCleanAlpha.checked = true;
+            if (chkFlipY) chkFlipY.checked = false;
+        }
 
         updateEstimates();
     }
@@ -398,6 +462,7 @@
 
     if (btnPresetUltraLight) {
         btnPresetUltraLight.addEventListener('click', () => {
+            if (selTextureScale) selTextureScale.value = 'auto';
             autoTuneForMobile();
         });
     }
@@ -423,13 +488,6 @@
                     currentImage = img;
                     currentAstcResult = null;
 
-                    // Ajuste estándar oficial Psych Mobile: Bloque 6x6, Modo Frame por Frame
-                    if (selBlockSize) selBlockSize.value = '6x6';
-                    setQualityMode('framebyframe');
-                    if (selTextureScale) selTextureScale.value = '1.0';
-                    if (chkCleanAlpha) chkCleanAlpha.checked = true;
-                    if (chkFlipY) chkFlipY.checked = false;
-
                     if (lblPngBtn) {
                         lblPngBtn.textContent = `✓ PNG: ${file.name}`;
                     }
@@ -437,15 +495,9 @@
                         window.setImportButtonState(btnUploadPng || e.target, 'success', { fileName: file.name });
                     }
 
-                    updateEstimates();
-
-                    // Si la textura es grande (pesaría > 1.2 MB en 100%), auto-ajustar directamente a < 1 MB
-                    const origW = img.naturalWidth || img.width;
-                    const origH = img.naturalHeight || img.height;
-                    const rawWeight = (Math.ceil(origW / 6) * Math.ceil(origH / 6)) * 16 + 16;
-                    if (rawWeight > 1.2 * 1024 * 1024) {
-                        autoTuneForMobile();
-                    }
+                    // Establecer 'auto' como predeterminado para optimizar al máximo proporcionalmente (< 1 MB)
+                    if (selTextureScale) selTextureScale.value = 'auto';
+                    autoTuneForMobile();
 
                     if (configContainer) configContainer.style.display = 'block';
                     if (resultContainer) resultContainer.style.display = 'none';
@@ -496,7 +548,7 @@
                         }
                     }
 
-                    renderPreview();
+                    refreshPlan();
                 },
                 onError: () => {
                     currentXmlFile = null;
@@ -505,7 +557,7 @@
                         lblXmlBtn.textContent = '2. Subir Archivo .XML (Base de frames)';
                     }
                     if (xmlBaseBadge) xmlBaseBadge.style.display = 'none';
-                    renderPreview();
+                    refreshPlan();
                 }
             });
         });
@@ -522,8 +574,25 @@
                 window.setImportButtonState(btnUploadXml, 'reset');
             }
             if (xmlBaseBadge) xmlBaseBadge.style.display = 'none';
-            renderPreview();
+            refreshPlan();
         });
+    }
+
+    // Recalcula dimensiones y peso (y el auto-ajuste si está activo) sin tocar el resto de opciones
+    function refreshPlan() {
+        if (!currentImage) {
+            renderPreview();
+            return;
+        }
+        if (selTextureScale && selTextureScale.value === 'auto') {
+            autoTuneForMobile({ keepSettings: true });
+        } else {
+            updateEstimates();
+        }
+    }
+
+    if (chkRepackAtlas) {
+        chkRepackAtlas.addEventListener('change', refreshPlan);
     }
 
     if (chkShowXmlFrames) {
@@ -537,7 +606,15 @@
     }
 
     if (selBlockSize) selBlockSize.addEventListener('change', updateEstimates);
-    if (selTextureScale) selTextureScale.addEventListener('change', updateEstimates);
+    if (selTextureScale) {
+        selTextureScale.addEventListener('change', () => {
+            if (selTextureScale.value === 'auto') {
+                autoTuneForMobile();
+            } else {
+                updateEstimates();
+            }
+        });
+    }
 
     // SISTEMA DE CARGA CON CONTEO DE PORCENTAJE (0 a 100%) Y FRASES INTELIGENTES
     const globalLoader = document.getElementById('globalLoader');
@@ -601,8 +678,9 @@
 
             const origW = currentImage.naturalWidth || currentImage.width;
             const origH = currentImage.naturalHeight || currentImage.height;
-            const targetW = Math.max(4, Math.round(origW * scale));
-            const targetH = Math.max(4, Math.round(origH * scale));
+            const plan = planOutput(scale, bx, by);
+            const targetW = plan.width;
+            const targetH = plan.height;
             const isFlipped = chkFlipY && chkFlipY.checked;
             const bpp = (128 / (bx * by)).toFixed(2);
 
@@ -635,22 +713,21 @@
             updateLoader(45, 'Escaneo IA: Eliminando halos y purgando fondos...', scanSubtext);
             await new Promise(r => setTimeout(r, 250));
 
-            // Crear lienzo de trabajo con la orientación y escala correctas
-            const canvas = document.createElement('canvas');
-            canvas.width = targetW;
-            canvas.height = targetH;
-            const ctx = canvas.getContext('2d');
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
+            // Imagen de origen DE PIE (solo se invierte si el usuario indica que su PNG está de cabeza)
+            const source = isFlipped ? window.ASTCEngine.flipCanvasVertical(currentImage) : currentImage;
 
-            if (isFlipped) {
-                ctx.save();
-                ctx.translate(0, targetH);
-                ctx.scale(1, -1);
-                ctx.drawImage(currentImage, 0, 0, targetW, targetH);
-                ctx.restore();
+            // Lienzo de trabajo: atlas reempaquetado (con XML) o la imagen completa escalada
+            let canvas;
+            if (plan.pack) {
+                canvas = window.ASTCEngine.renderPackedAtlas(source, plan.pack);
             } else {
-                ctx.drawImage(currentImage, 0, 0, targetW, targetH);
+                canvas = document.createElement('canvas');
+                canvas.width = targetW;
+                canvas.height = targetH;
+                const ctx = canvas.getContext('2d');
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+                ctx.drawImage(source, 0, 0, targetW, targetH);
             }
 
             updateLoader(55, 'Escaneo IA: Eliminando halos y purgando fondos...', 'Detectando croma de escenario Flash/Photoshop (blanco / púrpura)...');
@@ -664,19 +741,22 @@
 
             const startTime = performance.now();
 
-            const xmlFramesScaled = (currentXmlData && currentXmlData.frames) ? currentXmlData.frames.map(f => ({
-                x: Math.round(f.x * scale),
-                y: Math.round(f.y * scale),
-                w: Math.round(f.w * scale),
-                h: Math.round(f.h * scale)
-            })) : null;
+            // Cajas de los fotogramas en las coordenadas de la textura de salida
+            const xmlFramesScaled = plan.pack
+                ? plan.pack.items.map(it => ({ x: it.px, y: it.py, w: it.pw, h: it.ph }))
+                : (currentXmlData && currentXmlData.frames) ? currentXmlData.frames.map(f => ({
+                    x: Math.round(f.x * scale),
+                    y: Math.round(f.y * scale),
+                    w: Math.round(f.w * scale),
+                    h: Math.round(f.h * scale)
+                })) : null;
 
+            // Sin flipY explícito: se guarda de pie, igual que las texturas originales del juego
             const result = await window.ASTCEngine.encodeCanvasToAstc(canvas, {
                 blockX: bx,
                 blockY: by,
                 mode: mode,
                 xmlFrames: xmlFramesScaled,
-                flipY: false,
                 bleedAlpha: chkCleanAlpha ? chkCleanAlpha.checked : true
             });
 
@@ -688,8 +768,9 @@
             // FASE 5: Verificando integridad y decodificando prueba... (88% -> 99%)
             updateLoader(94, 'Verificando integridad y decodificando prueba...', 'Decodificando textura ASTC generada con WebAssembly...');
 
-            // Decodificar textura ASTC para la vista previa (con flipY: isFlipped para verla DE PIE, cabeza arriba)
-            const decodedResult = await window.ASTCEngine.astcToCanvas(result.astcBytes, { flipY: isFlipped });
+            // Decodificar la textura ASTC generada para la vista previa:
+            // el motor compensa la salida invertida del decodificador, así que se ve DE PIE igual que el PNG.
+            const decodedResult = window.ASTCEngine.astcToCanvas(result.astcBytes);
             const decodedCanvas = (decodedResult && decodedResult.canvas) ? decodedResult.canvas : decodedResult;
             currentDecodedCanvas = decodedCanvas;
 
@@ -715,6 +796,7 @@
                 origW,
                 origH,
                 scale,
+                pack: plan.pack,
                 mode,
                 audit
             };
@@ -727,6 +809,19 @@
                 const pCtx = previewCanvas.getContext('2d');
                 pCtx.clearRect(0, 0, decodedCanvas.width, decodedCanvas.height);
                 pCtx.drawImage(decodedCanvas, 0, 0);
+            }
+
+            // Si el atlas se reempaquetó o se escaló, el XML original ya no sirve: mostrar descarga del XML nuevo
+            const btnScaledXml = document.getElementById('btnDownloadScaledXml');
+            if (btnScaledXml) {
+                if (needsNewXml()) {
+                    btnScaledXml.style.display = 'inline-block';
+                    btnScaledXml.textContent = plan.pack
+                        ? `📄 Descargar XML Nuevo (obligatorio · atlas reempaquetado)`
+                        : `📄 Descargar XML Sincronizado (${(scale * 100).toFixed(0)}%)`;
+                } else {
+                    btnScaledXml.style.display = 'none';
+                }
             }
 
             // Actualizar tarjetas de estadísticas
@@ -894,26 +989,120 @@
     if (btnBgWhite) btnBgWhite.addEventListener('click', () => setPreviewBg('white'));
     if (btnBgPurple) btnBgPurple.addEventListener('click', () => setPreviewBg('purple'));
 
-    // Descarga nativa exclusiva .ASTC (sin ZIP)
+    // Botón para voltear la vista previa manualmente con 1 clic (↕ Voltear Vista)
+    const btnFlipPreview = document.getElementById('btnFlipPreview');
+    if (btnFlipPreview) {
+        btnFlipPreview.addEventListener('click', () => {
+            if (!currentDecodedCanvas) return;
+            currentDecodedCanvas = window.ASTCEngine.flipCanvasVertical(currentDecodedCanvas);
+            const previewCanvas = document.getElementById('resAstcPreviewCanvas');
+            if (previewCanvas) {
+                previewCanvas.width = currentDecodedCanvas.width;
+                previewCanvas.height = currentDecodedCanvas.height;
+                const pCtx = previewCanvas.getContext('2d');
+                pCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+                pCtx.drawImage(currentDecodedCanvas, 0, 0);
+            }
+        });
+    }
+
+    function needsNewXml() {
+        if (!currentXmlFile || !currentXmlData || !currentAstcResult) return false;
+        return !!currentAstcResult.pack || currentAstcResult.scale !== 1.0;
+    }
+
+    function outputBaseName() {
+        return currentPngFile ? currentPngFile.name.replace(/\.[^/.]+$/, '') : 'textura';
+    }
+
+    function downloadBlob(blob, name) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    // Genera el Sparrow XML que corresponde EXACTAMENTE a la textura .astc generada
+    // (nuevas posiciones si se reempaquetó, y todas las medidas escaladas si se redujo la escala).
+    async function buildOutputXml() {
+        const scale = currentAstcResult.scale;
+        const pack = currentAstcResult.pack;
+        const doc = new DOMParser().parseFromString(await currentXmlFile.text(), 'text/xml');
+        const atlas = doc.getElementsByTagName('TextureAtlas')[0];
+        if (atlas) atlas.setAttribute('imagePath', outputBaseName() + '.png');
+
+        const subTextures = doc.getElementsByTagName('SubTexture');
+        for (let i = 0; i < subTextures.length; i++) {
+            const st = subTextures[i];
+            const num = (attr) => parseInt(st.getAttribute(attr)) || 0;
+            const scaleAttr = (attr) => {
+                if (st.hasAttribute(attr)) {
+                    const val = parseFloat(st.getAttribute(attr));
+                    if (!isNaN(val)) st.setAttribute(attr, Math.round(val * scale).toString());
+                }
+            };
+
+            if (pack) {
+                const item = pack.map.get(`${num('x')},${num('y')},${num('width')},${num('height')}`);
+                if (item) {
+                    st.setAttribute('x', item.px.toString());
+                    st.setAttribute('y', item.py.toString());
+                    st.setAttribute('width', item.pw.toString());
+                    st.setAttribute('height', item.ph.toString());
+                }
+            } else {
+                scaleAttr('x');
+                scaleAttr('y');
+                scaleAttr('width');
+                scaleAttr('height');
+            }
+            scaleAttr('frameX');
+            scaleAttr('frameY');
+            scaleAttr('frameWidth');
+            scaleAttr('frameHeight');
+        }
+        return new XMLSerializer().serializeToString(doc);
+    }
+
+    async function downloadOutputXml() {
+        try {
+            const xmlStr = await buildOutputXml();
+            downloadBlob(new Blob([xmlStr], { type: 'text/xml' }), outputBaseName() + '.xml');
+        } catch (err) {
+            console.error('Error al generar XML:', err);
+            alert('❌ Error al procesar XML: ' + err.message);
+        }
+    }
+
+    // Botón para descargar el Sparrow XML nuevo (reempaquetado / escalado)
+    const btnDownloadScaledXml = document.getElementById('btnDownloadScaledXml');
+    if (btnDownloadScaledXml) {
+        btnDownloadScaledXml.addEventListener('click', () => {
+            if (!needsNewXml()) {
+                alert('ℹ️ La textura conserva la distribución y resolución del PNG original, así que tu XML original sigue siendo válido.');
+                return;
+            }
+            downloadOutputXml();
+        });
+    }
+
+    // Descarga del .ASTC nativo (y de su XML nuevo cuando el original ya no es válido)
     if (btnDownloadAstc) {
-        btnDownloadAstc.addEventListener('click', () => {
+        btnDownloadAstc.addEventListener('click', async () => {
             if (!currentAstcResult || !currentAstcResult.astcBytes) {
                 alert('❌ No hay ningún archivo ASTC comprimido para descargar.');
                 return;
             }
 
-            const baseName = currentPngFile ? currentPngFile.name.replace(/\.[^/.]+$/, '') : 'textura';
-            const downloadName = baseName + '.astc';
-
-            const blob = new Blob([currentAstcResult.astcBytes], { type: 'application/octet-stream' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = downloadName;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            downloadBlob(new Blob([currentAstcResult.astcBytes], { type: 'application/octet-stream' }), outputBaseName() + '.astc');
+            if (needsNewXml()) {
+                await new Promise(r => setTimeout(r, 400));
+                await downloadOutputXml();
+            }
         });
     }
 

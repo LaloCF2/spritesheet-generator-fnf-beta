@@ -191,15 +191,25 @@
         }
 
         let dupCount = spritesDetectados.length - uniqueFrames.length;
+
+        const blockX = (astcHeader && astcHeader.blockX) || 6;
+        const blockY = (astcHeader && astcHeader.blockY) || 6;
+
+        // Empaquetado alineado a la rejilla de bloques ASTC (con 2px de separación):
+        // ningún bloque mezcla píxeles de dos fotogramas, evitando bordes sucios en el juego.
+        const PAD = 2;
+        const cellW = (s) => Math.ceil((s.w + PAD) / blockX) * blockX;
+        const cellH = (s) => Math.ceil((s.h + PAD) / blockY) * blockY;
+
         uniqueFrames.sort((a, b) => b.h - a.h);
         let totalArea = 0;
         let maxW = 0;
         for (let s of uniqueFrames) {
-            totalArea += (s.w * s.h);
-            if (s.w > maxW) maxW = s.w;
+            totalArea += cellW(s) * cellH(s);
+            if (cellW(s) > maxW) maxW = cellW(s);
         }
 
-        let idealWidth = Math.ceil(Math.sqrt(totalArea) * 1.15);
+        let idealWidth = Math.ceil(Math.sqrt(totalArea * 1.05) / blockX) * blockX;
         let maxWidth = Math.max(maxW, idealWidth);
         let currentX = 0;
         let currentY = 0;
@@ -207,15 +217,15 @@
         let actualMaxWidth = 0;
 
         for (let s of uniqueFrames) {
-            if (currentX + s.w > maxWidth) {
+            if (currentX > 0 && currentX + cellW(s) > maxWidth) {
                 currentX = 0;
                 currentY += shelfHeight;
                 shelfHeight = 0;
             }
             s.packX = currentX;
             s.packY = currentY;
-            currentX += s.w;
-            if (s.h > shelfHeight) shelfHeight = s.h;
+            currentX += cellW(s);
+            if (cellH(s) > shelfHeight) shelfHeight = cellH(s);
             if (currentX > actualMaxWidth) actualMaxWidth = currentX;
         }
 
@@ -231,9 +241,11 @@
         let baseName = nombreArchivo.replace(/\.[^/.]+$/, "");
         let finalBaseName = isOptimized ? baseName + "_opt" : baseName;
 
-        let nombreZipPNG = finalBaseName + ".png";
-        let nombreZipASTC = finalBaseName + ".astc";
-        let nombreZipXML = finalBaseName + ".xml";
+        // Los archivos dentro del ZIP conservan el nombre original para que el JSON
+        // del personaje (campo "image") los encuentre sin renombrar nada. Solo el ZIP lleva "_opt".
+        let nombreZipPNG = baseName + ".png";
+        let nombreZipASTC = baseName + ".astc";
+        let nombreZipXML = baseName + ".xml";
 
         // Generate Sparrow XML
         let xmlLines = [];
@@ -258,15 +270,14 @@
         }
         await new Promise(r => setTimeout(r, 60));
 
-        const blockX = (astcHeader && astcHeader.blockX) || 6;
-        const blockY = (astcHeader && astcHeader.blockY) || 6;
-
         let astcEncoded = null;
         try {
+            // Modo 'safe': conserva brillos y sombras semitransparentes (solo sangrado de color)
             astcEncoded = await window.ASTCEngine.encodeCanvasToAstc(packCanvas, {
                 blockX: blockX,
                 blockY: blockY,
-                quality: 'medium'
+                quality: 'medium',
+                mode: 'safe'
             });
         } catch (encErr) {
             console.warn("Aviso al comprimir ASTC, continuando con PNG:", encErr);
@@ -299,7 +310,9 @@
             let msg = `¡Éxito! Atlas optimizado para Android.\n\n` +
                       `• Se eliminaron ${dupCount} fotogramas duplicados.\n` +
                       `• Tu archivo ZIP incluye:\n` +
-                      `  - ${nombreZipASTC} (Textura comprimida ASTC ${blockX}x${blockY})\n` +
+                      (astcEncoded && astcEncoded.astcBytes
+                          ? `  - ${nombreZipASTC} (Textura comprimida ASTC ${blockX}x${blockY} · ${packCanvas.width}x${packCanvas.height})\n`
+                          : `  - ⚠️ No se pudo generar el .ASTC (revisa la consola)\n`) +
                       `  - ${nombreZipPNG} (Copia PNG de respaldo)\n` +
                       `  - ${nombreZipXML} (Sparrow XML)\n`;
             if (jsonExportData) {

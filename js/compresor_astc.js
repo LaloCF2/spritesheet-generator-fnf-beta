@@ -240,12 +240,13 @@
 
                 const startTime = performance.now();
 
-                // Recomprimir ASTC con sangrado de color oficial Arm y ponderación alfa
+                // Recomprimir ASTC conservando resolución y distribución (el XML original sigue siendo válido).
+                // Modo 'safe': solo sangrado de color, sin borrar píxeles semitransparentes.
                 const result = await window.ASTCEngine.encodeCanvasToAstc(canvas, {
                     blockX: bx,
                     blockY: by,
                     quality: quality,
-                    flipY: false,
+                    mode: 'safe',
                     bleedAlpha: chkCleanAlpha ? chkCleanAlpha.checked : true
                 });
 
@@ -268,7 +269,9 @@
                     }
                 }
 
-                renderPreviewCanvas(canvas);
+                // Vista previa del resultado REAL (decodificando el .astc generado)
+                const check = window.ASTCEngine.astcToCanvas(result.astcBytes);
+                renderPreviewCanvas(check.canvas);
 
                 if (btnDownload) {
                     btnDownload.style.display = 'block';
