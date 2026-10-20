@@ -379,15 +379,21 @@
                     let bestR = data[p4], bestG = data[p4 + 1], bestB = data[p4 + 2], found = false;
                     const searchRadius = (mode === 'advanced') ? 5 : 4;
 
-                    for (let dy = -searchRadius; dy <= searchRadius && !found; dy++) {
+                    // Tomar el color del píxel opaco MÁS CERCANO (antes se tomaba el primero encontrado
+                    // desde arriba a la izquierda, lo que pintaba bordes con colores de otra zona:
+                    // puntos blancos/naranjas alrededor del contorno)
+                    let bestDist = Infinity;
+                    for (let dy = -searchRadius; dy <= searchRadius; dy++) {
                         const ny = y + dy;
                         if (ny < 0 || ny >= height) continue;
                         const nRow = ny * width;
-                        for (let dx = -searchRadius; dx <= searchRadius && !found; dx++) {
+                        for (let dx = -searchRadius; dx <= searchRadius; dx++) {
                             const nx = x + dx;
                             if (nx < 0 || nx >= width) continue;
                             const np = nRow + nx;
-                            if (isOpaque[np] === 1) {
+                            const dist = dx * dx + dy * dy;
+                            if (isOpaque[np] === 1 && dist < bestDist) {
+                                bestDist = dist;
                                 bestR = rCopy[np];
                                 bestG = gCopy[np];
                                 bestB = bCopy[np];
@@ -804,64 +810,84 @@
             return { payload, report: { revisados: 0, reparados: 0, fugasAntes: 0, fugasDespues: 0, seg: 0 } };
         }
 
-        // 2. Variantes de entrada para los bloques malos, empaquetadas en un mosaico
-        const cols = Math.ceil(Math.sqrt(bad.length));
-        const rows = Math.ceil(bad.length / cols);
-        const tw = cols * bx, th = rows * by;
-        const makeTiles = (transform) => {
-            const t = new Uint8Array(tw * th * 4);
-            bad.forEach((b, k) => {
+        const exhaustive = Object.assign({}, baseConfig, { quality: 100 });
+        const out = new Uint8Array(payload);
+        let curDec = dec;
+
+        // Recomprime una lista de bloques con varias variantes de entrada (empaquetados en un mosaico,
+        // una sola llamada al codificador por variante) y se queda, bloque a bloque, con la opción
+        // de menor error visual frente a la entrada real (incluida la que ya había).
+        const tryVariants = (blocks, transforms) => {
+            const cols = Math.ceil(Math.sqrt(blocks.length));
+            const rows = Math.ceil(blocks.length / cols);
+            const tw = cols * bx, th = rows * by;
+            const candidates = transforms.map(transform => {
+                const t = new Uint8Array(tw * th * 4);
+                blocks.forEach((b, k) => {
+                    const gx = b % nbx, gy = (b / nbx) | 0;
+                    const tx = (k % cols) * bx, ty = ((k / cols) | 0) * by;
+                    for (let j = 0; j < by; j++) {
+                        const y = Math.min(height - 1, gy * by + j);
+                        for (let i = 0; i < bx; i++) {
+                            const x = Math.min(width - 1, gx * bx + i);
+                            const s = (y * width + x) * 4, d = ((ty + j) * tw + (tx + i)) * 4;
+                            t[d] = src[s]; t[d + 1] = src[s + 1]; t[d + 2] = src[s + 2];
+                            t[d + 3] = transform ? transform(src[s + 3]) : src[s + 3];
+                        }
+                    }
+                });
+                const p = new Uint8Array(encoder.compressImage({ dimX: tw, dimY: th, dimZ: 1, dataType: 0, data: t }, exhaustive, swizzle, 1));
+                return { payload: p, dec: decodePayloadUpright(p, tw, th, bx, by) };
+            });
+            let changed = 0;
+            blocks.forEach((b, k) => {
                 const gx = b % nbx, gy = (b / nbx) | 0;
                 const tx = (k % cols) * bx, ty = ((k / cols) | 0) * by;
-                for (let j = 0; j < by; j++) {
-                    const y = Math.min(height - 1, gy * by + j);
-                    for (let i = 0; i < bx; i++) {
-                        const x = Math.min(width - 1, gx * bx + i);
-                        const s = (y * width + x) * 4, d = ((ty + j) * tw + (tx + i)) * 4;
-                        t[d] = src[s]; t[d + 1] = src[s + 1]; t[d + 2] = src[s + 2];
-                        t[d + 3] = transform ? transform(src[s + 3]) : src[s + 3];
-                    }
+                const vw = Math.min(bx, width - gx * bx), vh = Math.min(by, height - gy * by);
+                let best = blockError(src, curDec, width, gx * bx, gy * by, vw, vh, width, gx * bx, gy * by);
+                let bestCand = -1;
+                candidates.forEach((c, ci) => {
+                    const e = blockError(src, c.dec, tw, tx, ty, vw, vh, width, gx * bx, gy * by);
+                    if (e < best) { best = e; bestCand = ci; }
+                });
+                if (bestCand >= 0) {
+                    out.set(candidates[bestCand].payload.subarray(k * 16, k * 16 + 16), b * 16);
+                    changed++;
                 }
             });
-            return t;
+            curDec = decodePayloadUpright(out, width, height, bx, by);
+            return changed;
         };
-        const variants = [
-            makeTiles(null),                                                                    // misma entrada, calidad máxima
-            makeTiles(a => (a < 96 ? 0 : a >= 200 ? 255 : Math.round((a - 96) * 255 / 104))),  // borde más definido
-            makeTiles(a => (a < 128 ? 0 : a >= 176 ? 255 : Math.round((a - 128) * 255 / 48)))  // borde muy definido
-        ];
-        const exhaustive = Object.assign({}, baseConfig, { quality: 100 });
-        const candidates = variants.map(data => {
-            const p = new Uint8Array(encoder.compressImage({ dimX: tw, dimY: th, dimZ: 1, dataType: 0, data }, exhaustive, swizzle, 1));
-            return { payload: p, dec: decodePayloadUpright(p, tw, th, bx, by) };
-        });
 
-        // 3. Elegir por bloque la mejor opción (incluida la original) comparando contra la entrada real
-        const out = new Uint8Array(payload);
-        let repaired = 0;
-        const wins = candidates.map(() => 0);
-        bad.forEach((b, k) => {
+        // Etapa 1: misma entrada con calidad máxima (como "astcenc -exhaustive") en todos los bloques malos
+        let repaired = tryVariants(bad, [null]);
+
+        // Etapa 2: solo los bloques que siguen con residuos prueban un borde más definido
+        const stillBad = bad.filter(b => {
             const gx = b % nbx, gy = (b / nbx) | 0;
-            const tx = (k % cols) * bx, ty = ((k / cols) | 0) * by;
-            const vw = Math.min(bx, width - gx * bx), vh = Math.min(by, height - gy * by);
-            let best = blockError(src, dec, width, gx * bx, gy * by, vw, vh, width, gx * bx, gy * by);
-            let bestCand = -1;
-            candidates.forEach((c, ci) => {
-                const e = blockError(src, c.dec, tw, tx, ty, vw, vh, width, gx * bx, gy * by);
-                if (e < best) { best = e; bestCand = ci; }
-            });
-            if (bestCand >= 0) {
-                out.set(candidates[bestCand].payload.subarray(k * 16, k * 16 + 16), b * 16);
-                wins[bestCand]++;
-                repaired++;
+            for (let j = 0; j < by; j++) {
+                const y = gy * by + j;
+                if (y >= height) break;
+                for (let i = 0; i < bx; i++) {
+                    const x = gx * bx + i;
+                    if (x >= width) break;
+                    const k = (y * width + x) * 4;
+                    if (src[k + 3] === 0 && curDec[k + 3] >= 6) return true;
+                }
             }
+            return false;
         });
+        if (stillBad.length > 0) {
+            repaired += tryVariants(stillBad, [
+                a => (a < 96 ? 0 : a >= 200 ? 255 : Math.round((a - 96) * 255 / 104)),   // borde más definido
+                a => (a < 128 ? 0 : a >= 176 ? 255 : Math.round((a - 128) * 255 / 48))   // borde muy definido
+            ]);
+        }
 
-        // 4. Medir el resultado final
-        const dec2 = decodePayloadUpright(out, width, height, bx, by);
+        // Medir el resultado final
         let leakAfter = 0;
         for (let k = 0; k < src.length; k += 4) {
-            if (src[k + 3] === 0 && dec2[k + 3] >= 6) leakAfter++;
+            if (src[k + 3] === 0 && curDec[k + 3] >= 6) leakAfter++;
         }
         return {
             payload: out,
@@ -870,7 +896,6 @@
                 reparados: repaired,
                 fugasAntes: leakBefore,
                 fugasDespues: leakAfter,
-                ganadores: wins.join("/"),
                 seg: +((performance.now() - t0) / 1000).toFixed(1)
             }
         };
@@ -879,10 +904,11 @@
     async function encodeCanvasToAstc(canvas, options = {}) {
         const blockX = options.blockX || 6;
         const blockY = options.blockY || 6;
-        const mode = options.mode || 'framebyframe';
+        // Por defecto: fiel al original (como astcenc), sin borrar ni recolorear píxeles del dibujo
+        const mode = options.mode || 'normal';
         let qualityName = (options.quality || '').toLowerCase();
         if (!qualityName) {
-            if (mode === 'normal') qualityName = 'fast';
+            if (mode === 'normal' || mode === 'safe') qualityName = 'thorough';
             else if (mode === 'framebyframe') qualityName = 'thorough';
             else if (mode === 'advanced') qualityName = 'exhaustive';
             else qualityName = 'thorough';
@@ -951,6 +977,12 @@
             blockZ: 1,
             quality: quality
         };
+        // Peso del canal alfa = 8 (equivale a "astcenc -cw 1 1 1 8"): el codificador cuida mucho más
+        // la transparencia, reduciendo residuos alrededor del personaje y huecos en zonas opacas.
+        // Medido con soul.png en 8x8: residuos visibles 952 -> 628 y huecos 486 -> 165.
+        rawConfig.cwAWeight = 8;
+        // Opciones avanzadas de astcenc (equivalentes a -cw, -a y -tune... de la herramienta oficial de Arm)
+        if (options.astcencConfig) Object.assign(rawConfig, options.astcencConfig);
 
         const rawSwizzle = {
             r: 0,

@@ -19,6 +19,7 @@
     <link rel="apple-touch-icon" href="logo-192.png">
 
     <!-- Arm astcenc WebAssembly Encoder + ASTC Engine -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="js/astcenc_data.js?v=2"></script>
     <script src="js/astcenc.js?v=2"></script>
     <script src="js/astc_engine.js?v=2"></script>
@@ -327,36 +328,35 @@
                             <!-- Alerta y Optimización Automática para Texturas Grandes -->
                             <div id="boxLargeTextureAlert" style="display:none; background: rgba(255, 170, 0, 0.08); border: 1px solid rgba(255, 170, 0, 0.35); border-radius: 10px; padding: 12px 16px; margin-bottom: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
                                 <div>
-                                    <div style="font-weight: 800; color: #ffaa00; font-size: 0.88rem;">⚠️ Textura Grande Detectada (Pesaría <span id="txtAlertOrigWeight">-- MB</span> en ASTC Crudo)</div>
-                                    <div style="font-size: 0.76rem; color: #ccc;">Para que tu mod de FNF Android no tenga lag y el archivo pese alrededor de 1 MB o menos:</div>
+                                    <div style="font-weight: 800; color: #ffaa00; font-size: 0.88rem;">⚠️ Textura Muy Grande (<span id="txtAlertOrigWeight">-- px</span>)</div>
+                                    <div style="font-size: 0.76rem; color: #ccc;">Muchos celulares no pueden cargar texturas de más de 4096 px por lado (el juego se cierra o la textura sale en negro).</div>
                                 </div>
                                 <button type="button" class="btn-pildora" id="btnAutoTuneMobile" style="padding: 8px 16px; font-size: 0.82rem; background: linear-gradient(135deg, #00ff88, #00e5ff); color: black; font-weight: 800; border: none; cursor: pointer; box-shadow: 0 0 15px rgba(0,255,136,0.3);">
-                                    ⚡ Optimizar Automáticamente a &lt; 1 MB
+                                    ⚡ Ajustar automáticamente
                                 </button>
                             </div>
 
                             <!-- Presets de Optimización Rápida Basados en Guía Oficial Arm ASTC -->
                             <div style="background: rgba(255, 255, 255, 0.03); padding: 12px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.08);">
                                 <div style="font-size: 0.78rem; color: #aaa; margin-bottom: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">
-                                    ⚡ Presets Oficiales Arm ASTC (Sin distorsión en bordes):
+                                    ⚡ Prioridad (siempre al 100% de resolución):
                                 </div>
                                 <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                                    <button type="button" class="btn-pildora" id="btnPresetUltraLight"
-                                        style="padding: 7px 14px; font-size: 0.82rem; border-color: #00ff88; color: #00ff88; background: rgba(0,255,136,0.12); font-weight: 800; cursor: pointer;">
-                                        ⚡ Ultra Ahorro Móvil (&lt; 1 MB · Auto-Ajuste)
+                                    <button type="button" class="btn-pildora" id="btnPresetPristine"
+                                        style="padding: 7px 14px; font-size: 0.82rem; border-color: #ffd700; color: #ffd700; background: rgba(255,215,0,0.08); cursor: pointer;">
+                                        💎 Calidad Máxima (5×5 · casi idéntico al PNG)
                                     </button>
                                     <button type="button" class="btn-pildora" id="btnPresetStandard"
-                                        style="padding: 7px 14px; font-size: 0.82rem; border-color: #00e5ff; color: #00e5ff; background: rgba(0,229,255,0.08); cursor: pointer;">
-                                        ⭐ Estándar Psych Mobile (100% Escala · 6×6)
+                                        style="padding: 7px 14px; font-size: 0.82rem; border-color: #00e5ff; color: #00e5ff; background: rgba(0,229,255,0.12); font-weight: 800; cursor: pointer;">
+                                        ⭐ Equilibrio (6×6 · Recomendado)
                                     </button>
                                     <button type="button" class="btn-pildora" id="btnPresetReduced"
                                         style="padding: 7px 14px; font-size: 0.82rem; border-color: #b57cff; color: #b57cff; background: rgba(181,124,255,0.08); cursor: pointer;">
-                                        🚀 Ahorro Balanceado (-44% peso · 8×8)
+                                        🚀 Ligero (8×8 · -44% peso, manchas de color)
                                     </button>
-                                    <button type="button" class="btn-pildora" id="btnPresetPristine"
-                                        style="padding: 7px 14px; font-size: 0.82rem; border-color: #ffd700; color: #ffd700; background: rgba(255,215,0,0.08); cursor: pointer;">
-                                        💎 Máxima Fidelidad (100% Escala · 5×5)
-                                    </button>
+                                </div>
+                                <div style="font-size: 0.72rem; color: #888; margin-top: 6px;">
+                                    Probado con BOYFRIEND: 8×8 = 1.0 MB (27.5 dB) · 6×6 = 1.7 MB (33.8 dB) · 5×5 = 2.6 MB (39.0 dB). Bajar la escala para ahorrar peso se ve peor que usar 8×8.
                                 </div>
                             </div>
 
@@ -366,7 +366,7 @@
                                     <span>📐</span> Escala / Resolución de Textura:
                                 </label>
                                 <select id="selTextureScale">
-                                    <option value="auto" selected>⚡ Auto-Ajuste Inteligente Móvil (Garantiza &lt; 1 MB Proporcional · Recomendado)</option>
+                                    <option value="auto" selected>⚡ Automático (100% de resolución · solo reduce si pasa de 4096 px · Recomendado)</option>
                                     <option value="1.0">100% - Resolución Original (1:1 Máxima Nitidez · Mismas dimensiones del XML)</option>
                                     <option value="0.85">85% - Ligera Reducción (Ahorra ~28% de peso adicional)</option>
                                     <option value="0.75">75% - Reducción Equilibrada (Ahorra ~44% de peso adicional)</option>
@@ -402,7 +402,7 @@
                                     <span>⚡</span> Calidad de Codificación y Modo de Limpieza:
                                 </label>
                                 
-                                <input type="hidden" id="selQuality" value="framebyframe">
+                                <input type="hidden" id="selQuality" value="normal">
 
                                 <div style="display: flex; gap: 10px; flex-direction: column;">
                                     <!-- Botón 1: Normal -->
@@ -411,8 +411,8 @@
                                         <div style="display: flex; align-items: center; gap: 12px;">
                                             <span style="font-size: 1.4rem;">🟢</span>
                                             <div>
-                                                <div style="font-weight: 800; font-size: 0.9rem; color: #fff;">1. Compresión Normal (Directa / Rápida)</div>
-                                                <div style="font-size: 0.75rem; color: #888;">Compresión estándar y rápida sin pasadas adicionales de análisis, ideal si la imagen ya no tiene residuos.</div>
+                                                <div style="font-weight: 800; font-size: 0.9rem; color: #fff;">1. Fiel al original · Estilo Arm astcenc (Recomendado)</div>
+                                                <div style="font-size: 0.75rem; color: #888;">Como la herramienta oficial de Arm: no borra ni recolorea nada del dibujo (conserva el suavizado y los brillos). Rellena de color solo lo 100% transparente, refuerza el canal alfa (-cw 1 1 1 8), calidad thorough y pule los bordes bloque por bloque.</div>
                                             </div>
                                         </div>
                                         <span class="mode-badge" id="badgeModeNormal" style="display:none; color: #00ff88; font-weight: 900; font-size: 1.1rem;">✓</span>
@@ -424,8 +424,8 @@
                                         <div style="display: flex; align-items: center; gap: 12px;">
                                             <span style="font-size: 1.4rem;">🟡</span>
                                             <div>
-                                                <div style="font-weight: 800; font-size: 0.9rem; color: #00e5ff;">2. Optimización Inteligente Frame por Frame (Recomendado)</div>
-                                                <div style="font-size: 0.75rem; color: #ccc;">Chequea frame por frame si hay XML importado para purgar halos feos, o revisa la imagen completa varias veces para eliminar cualquier residuo.</div>
+                                                <div style="font-weight: 800; font-size: 0.9rem; color: #00e5ff;">2. Quitar halos de Flash (Frame por Frame)</div>
+                                                <div style="font-size: 0.75rem; color: #ccc;">Borra brillos y bordes semitransparentes alrededor del personaje (halos blancos/morados de Flash). Úsalo solo si tu PNG trae ese halo y no lo quieres: también quita el suavizado del contorno.</div>
                                             </div>
                                         </div>
                                         <span class="mode-badge" id="badgeModeFrameByFrame" style="display:inline; color: #00ff88; font-weight: 900; font-size: 1.1rem;">✓</span>
@@ -437,8 +437,8 @@
                                         <div style="display: flex; align-items: center; gap: 12px;">
                                             <span style="font-size: 1.4rem;">🟣</span>
                                             <div>
-                                                <div style="font-weight: 800; font-size: 0.9rem; color: #b57cff;">3. Análisis Avanzado con IA Profunda (Ultra Purificación)</div>
-                                                <div style="font-size: 0.75rem; color: #888;">La página piensa más, analiza toda la imagen a fondo con escaneo multi-pasada, extingue halos blancos/morados y busca el menor error posible (1-2 min).</div>
+                                                <div style="font-weight: 800; font-size: 0.9rem; color: #b57cff;">3. Quitar halos agresivo (calidad exhaustive)</div>
+                                                <div style="font-size: 0.75rem; color: #888;">Como el modo 2 pero más fuerte y con calidad exhaustive (más lento). Puede borrar sombras y brillos que sí son parte del dibujo.</div>
                                             </div>
                                         </div>
                                         <span class="mode-badge" id="badgeModeAdvancedAi" style="display:none; color: #b57cff; font-weight: 900; font-size: 1.1rem;">✓</span>
@@ -498,7 +498,7 @@
 
                             <!-- Informational Box about Mobile VRAM and Single ASTC Export -->
                             <div style="background: rgba(0, 255, 136, 0.05); border: 1px dashed rgba(0, 255, 136, 0.25); border-radius: 8px; padding: 10px 14px; font-size: 0.78rem; color: #ccc; line-height: 1.4;">
-                                💡 <b>¿Por qué el ASTC puede pesar más que el PNG?</b> ASTC usa 16 bytes por bloque, <b>aunque el bloque esté vacío</b>: no comprime la transparencia como el PNG. Para que pese poco: sube el <b>XML</b> y deja activado <b>📦 Reempaquetar atlas</b> (quita el espacio vacío y los frames repetidos), usa bloques más grandes o reduce la escala. Si el atlas se reempaqueta o se escala, se descarga también el <b>XML nuevo</b>, que debes usar en lugar del original.
+                                💡 <b>¿Por qué el ASTC puede pesar más que el PNG?</b> ASTC usa 16 bytes por bloque, <b>aunque el bloque esté vacío</b>: no comprime la transparencia como el PNG. Para que pese poco: sube el <b>XML</b> y deja activado <b>📦 Reempaquetar atlas</b> (quita el espacio vacío y los frames repetidos), y si aún pesa mucho <b>reduce la escala</b> en lugar de usar bloques de 10×10 o 12×12 (esos ensucian los bordes del personaje). <b>Descarga:</b> solo PNG → un archivo <b>.astc</b>. Con XML (y JSON) → un <b>.zip</b> con el .astc, el XML nuevo, el JSON ajustado y un <b>informe .txt</b> de qué cambió y qué sigue igual. Usa siempre esos archivos juntos.
                             </div>
 
                             <!-- Compress Action Button -->
@@ -571,25 +571,14 @@
                     <!-- Caja de Logs / Diagnóstico de Auditoría IA -->
                     <div id="aiAuditLogBox" style="display: none; background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(0, 229, 255, 0.3); border-radius: 10px; padding: 14px 18px; margin-bottom: 20px; text-align: left; font-family: monospace; font-size: 0.82rem; line-height: 1.6;"></div>
 
-                    <!-- Botones de Acción: Reintentar IA + Descargar -->
-                    <div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap; margin-top:15px;">
-                        <button type="button" class="btn-pildora" id="btnReprocessAi"
-                            style="background: rgba(181, 124, 255, 0.12); color: #b57cff; border: 1px solid #b57cff; font-weight: 800; padding: 14px 22px; font-size: 0.95rem; cursor: pointer; transition: all 0.2s ease;">
-                            🔁 Reintentar / Repasar con IA Profunda
-                        </button>
-                        <button type="button" class="btn-pildora" id="btnDownloadScaledXml"
-                            style="display:none; background: rgba(0, 229, 255, 0.15); color: #00e5ff; border: 1px solid #00e5ff; font-weight: 800; padding: 14px 22px; font-size: 0.95rem; cursor: pointer;">
-                            📄 Descargar XML Sincronizado
-                        </button>
-                        <button type="button" class="btn-pildora" id="btnDownloadJson"
-                            style="display:none; background: rgba(181, 124, 255, 0.15); color: #b57cff; border: 1px solid #b57cff; font-weight: 800; padding: 14px 22px; font-size: 0.95rem; cursor: pointer;">
-                            🧍 Descargar JSON ajustado
-                        </button>
+                    <!-- Descarga única: solo PNG -> .astc · PNG + XML (y JSON) -> .zip con todo y un informe .txt -->
+                    <div style="display:flex; flex-direction:column; align-items:center; gap:8px; margin-top:15px;">
                         <button class="btn-pildora" id="btnDownloadAstc"
                             style="background: linear-gradient(135deg, #00e5ff, #00ff88); color: black; font-weight: 800; padding: 14px 28px; border: none; font-size: 1.05rem; cursor: pointer; box-shadow: 0 4px 15px rgba(0, 229, 255, 0.4);">
                             <img src="https://cdn-icons-png.flaticon.com/512/2874/2874091.png" class="icon icon-black" alt="Download">
-                            Descargar Archivo .ASTC (Nativo Ligero)
+                            <span id="lblDownloadMain">Descargar Archivo .ASTC</span>
                         </button>
+                        <div id="lblDownloadContents" style="font-size: 0.78rem; color: #aaa;"></div>
                     </div>
                 </div>
             </div>

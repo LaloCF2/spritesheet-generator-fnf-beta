@@ -4,15 +4,23 @@
 - **[NUEVO] Estudio de Texturas ASTC (Móviles / Android):**
   - **1. Optimizador ASTC + XML:** Permite importar texturas `.astc` junto a su `.xml` (Sparrow) para visualizar y reproducir animaciones, recortar y deduplicar frames, modificar la resolución/escala de la imagen, alinear automáticamente la posición y la cámara del personaje en Psych Engine y exportar paquetes `.zip` con la textura optimizada, el XML y el JSON.
   - **2. Convertir ASTC a PNG:** Decodificación WebAssembly 100% offline y ultrarrápida de texturas `.astc` a imágenes `.png` nítidas, con visor interactivo (zoom, fondos ajedrez/negro/blanco), estadísticas de bloque (bpp, dimensiones, total de bloques) y descarga inmediata.
-  - **3. Convertir PNG a ASTC (Ultra Optimizado & Cero Artefactos):** Compresión de imágenes `.png` al formato nativo `.astc` con cabecera estándar de 16 bytes. Orientación normal de pie por defecto (pies abajo, cabeza arriba), navegación completa entre carpetas en Android (`accept="*/*"`), importación dual de PNG + XML como base de verificación de fotogramas y descarga directa exclusiva en `.astc` nativo (sin ZIP).
-  - **4. Eliminación Total de Rellenos y Halos Glitcheados (Arm astcenc):** Incorporación del sistema avanzado de **Color Bleeding / Alpha Dilation** (5 pasadas) y métrica de error ponderada por alfa (`ASTCENC_FLG_USE_ALPHA_WEIGHT = 4`). Elimina por completo los halos y rellenos distorsionados blancos y morados dejados por Flash/Photoshop alrededor de los personajes.
-  - **5. Presets Oficiales Basados en Manual de Arm ASTC:**
-    - `⭐ Estándar Psych Mobile (100% Escala · 6×6 · Calidad Thorough)`: Calidad oficial recomendada para personajes en motores móviles.
-    - `🚀 Ahorro Balanceado (-44% peso · 8×8 · Calidad Thorough)`: Texturas nítidas con 44% menos peso que 6x6.
-    - `⚡ Ultra Ahorro (80 KB - 300 KB · Escala 50% + 8×8)`: Aplicación del consejo clave de Arm (reducir resolución en lugar de forzar bloques extremos) para conseguir texturas ultraligeras de 80 KB a 300 KB impecables y sin bordes corruptos.
-    - `💎 Máxima Fidelidad (100% Escala · 5×5 · Calidad Thorough)`: Fidelidad máxima para personajes principales.
-  - **6. Compresor de Texturas ASTC (Nuevo Optimizador):** Herramienta estilo 'Compresor PNG' para recomprimir texturas `.astc` pesadas a bloques ultra ligeros (`6x6`, `8x8`, `12x12`) y limpiar píxeles transparentes con sangrado de color, reduciendo el peso de MegaBytes a solo KiloBytes conservando 100% la resolución.
+  - **3. Convertir PNG a ASTC:** Compresión de imágenes `.png` al formato nativo `.astc` (cabecera estándar de 16 bytes, orientación de pie igual que las texturas originales del juego), navegación entre carpetas en Android (`accept="*/*"`) e importación opcional de `.xml` y `.json` del personaje.
+    - **Reempaquetado de atlas:** con el XML, quita el espacio vacío y los frames repetidos y alinea cada recorte a los bloques ASTC (ej. `soul.png` de 8192×8192 pasó de 16 MB a 2 MB sin perder resolución).
+    - **JSON del personaje (Psych Engine):** al reducir la escala ajusta automáticamente `scale`, `position` y `camera_position` con el mismo cálculo del Optimizador.
+    - **Descarga única:** solo PNG → `.astc`; PNG + XML (+ JSON) → `.zip` con el `.astc`, el XML nuevo, el JSON ajustado y un informe `.txt` de qué cambió y qué sigue igual.
+  - **4. Modo "Fiel al original" estilo Arm astcenc (Cero residuos):** no borra ni recolorea nada del dibujo (conserva suavizado, sombras y auras). Perfil LDR lineal (`-cl`), calidad Thorough, peso del canal alfa `-cw 1 1 1 8` y **pulido de bordes bloque por bloque** (recomprime con calidad Exhaustive los bloques del borde que dejaban residuos). El modo "Quitar halos de Flash" queda como opción.
+  - **5. Prioridades de calidad (siempre al 100% de resolución):**
+    - `💎 Calidad Máxima (5×5)`: casi idéntico al PNG.
+    - `⭐ Equilibrio (6×6 · Recomendado)`: opción por defecto.
+    - `🚀 Ligero (8×8)`: 44% menos peso que 6×6, con algo de manchas de color.
+    - La escala solo se reduce si el atlas pasa de 4096 px (límite de muchos celulares): bajar la resolución se ve peor que usar bloques grandes.
+  - **6. Compresor de Texturas ASTC:** Herramienta estilo 'Compresor PNG' para recomprimir texturas `.astc` pesadas a bloques más ligeros conservando 100% la resolución y la distribución (el XML original sigue siendo válido), con vista previa del resultado real decodificado.
   - **7. Motor ASTC WebAssembly 100% Offline:** Adaptación completa del compilador Arm ASTC con binario WASM embebido en Base64, funcionando sin errores de CORS ni bloqueos en cualquier navegador o al abrir el archivo directamente con `file:///`.
+- **[CORRECCIÓN] Estudio ASTC:**
+  - El Optimizador ASTC + XML exporta los archivos con su nombre original dentro del ZIP (antes `_opt`, lo que hacía que el juego mezclara la textura nueva con el XML viejo).
+  - Se eliminaron los puntos de color y los bordes escalonados que dejaba la limpieza de halos alrededor del personaje.
+  - El Compresor ASTC y el Optimizador ya no borran brillos ni sombras semitransparentes del personaje.
+- **[CORRECCIÓN] Compresor de Audio OGG:** Ya comprime correctamente (el motor FFmpeg fallaba al iniciar). Si ocurre un error, ahora se muestra la causa real.
 
 ## Versión 1.5.3
 - **[CORRECCIÓN] Transparencia Nativa 100% en Exportación de GIFs:**
