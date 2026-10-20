@@ -370,7 +370,7 @@ body {
     display: inline-block;
 }
 
-/* Responsividad para el botÃƒÂ³n flotante (Celulares) */
+/* Responsividad para el botón flotante (Celulares) */
 @media(max-width: 768px) {
     .fab-container {
         bottom: 40px;

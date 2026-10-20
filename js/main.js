@@ -1,7 +1,7 @@
 // ==========================================
 // NÚCLEO GLOBAL, VARIABLES Y FUNCIONES
 // ==========================================
-const CURRENT_VERSION = '1.5.2';
+const CURRENT_VERSION = '1.6.0';
 
 window.showChangelog = function (onlyLatest = false) {
     let modChangelog = document.getElementById('changelogModal');
@@ -746,7 +746,7 @@ window.duplicarActualAfinador = function () {
 };
 
 async function openWindow(winId) {
-    mostrarCargaGlobal("Cargando seccin...");
+    mostrarCargaGlobal("Cargando sección...");
     await pensar(50); // Creador de Blur
 
     document.querySelectorAll('.window-content').forEach(el => el.classList.remove('active'));

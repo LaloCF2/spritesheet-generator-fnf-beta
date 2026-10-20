@@ -20,6 +20,14 @@
   - El Optimizador ASTC + XML exporta los archivos con su nombre original dentro del ZIP (antes `_opt`, lo que hacía que el juego mezclara la textura nueva con el XML viejo).
   - Se eliminaron los puntos de color y los bordes escalonados que dejaba la limpieza de halos alrededor del personaje.
   - El Compresor ASTC y el Optimizador ya no borran brillos ni sombras semitransparentes del personaje.
+- **[NUEVO] Diseño unificado en todas las herramientas:**
+  - Todas las herramientas comparten la misma estructura: **cabecera con icono, título, descripción y pasos** (1 Sube → 2 Ajusta → 3 Descarga), los mismos paneles, botones, campos y **zonas para subir archivos**. Cada herramienta conserva su color propio.
+  - **Modo claro y oscuro corregidos en todas las páginas:** se acabaron los textos ilegibles en modo claro (Estudio ASTC, Generador GIF y sus herramientas) y los botones blancos en modo oscuro. El modo oscuro y el tema se aplican al instante al abrir la página.
+  - La página se muestra en cuanto está lista, sin esperar a que terminen de cargar los iconos externos.
+- **[NUEVO] Sistema de Logs:**
+  - **Tarjetas de mensaje animadas** en lugar de las alertas del navegador: etiqueta de tipo (ÉXITO / AVISO / ERROR / INFO), hora, explicación, detalle técnico y botón para copiar.
+  - **Avisos flotantes** apilados con barra de tiempo.
+  - **Consola "Registro de actividad"** (botón `Registro >_` abajo a la izquierda): todo lo que pasa en las herramientas con hora y etiquetas de color, filtros, copiar y limpiar. Se conserva al pasar de una herramienta a otra durante la sesión.
 - **[MEJORA] Compresor PNG (nuevo motor estilo pngquant/TinyPNG):**
   - Paleta de colores de alta calidad (median cut + k-means) que **protege los colores de zonas pequeñas** (ej. el micrófono verde no se vuelve gris) y comprime con codificador PNG propio (paleta de 1/2/4/8 bits, transparencia mínima, deflate nivel 9).
   - **Más reducción con mejor calidad:** BOYFRIEND.png de 2.08 MB → 415 KB (−81%) y soul.png de 5.20 MB → 664 KB (−88%), entre 19% y 26% más ligeros que antes.
