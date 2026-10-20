@@ -20,6 +20,11 @@
   - El Optimizador ASTC + XML exporta los archivos con su nombre original dentro del ZIP (antes `_opt`, lo que hacía que el juego mezclara la textura nueva con el XML viejo).
   - Se eliminaron los puntos de color y los bordes escalonados que dejaba la limpieza de halos alrededor del personaje.
   - El Compresor ASTC y el Optimizador ya no borran brillos ni sombras semitransparentes del personaje.
+- **[MEJORA] Compresor PNG (nuevo motor estilo pngquant/TinyPNG):**
+  - Paleta de colores de alta calidad (median cut + k-means) que **protege los colores de zonas pequeñas** (ej. el micrófono verde no se vuelve gris) y comprime con codificador PNG propio (paleta de 1/2/4/8 bits, transparencia mínima, deflate nivel 9).
+  - **Más reducción con mejor calidad:** BOYFRIEND.png de 2.08 MB → 415 KB (−81%) y soul.png de 5.20 MB → 664 KB (−88%), entre 19% y 26% más ligeros que antes.
+  - **Nivel de compresión 0-100** (más alto = menos peso; 0 = sin pérdida) con **nivel recomendado automático** al importar, que detecta brillos/degradados grandes para que no salgan bandas, y calidad estimada en vivo al mover la barra.
+  - Vista previa del resultado real con botón para comparar con el original, y difuminado (dithering) opcional para degradados.
 - **[CORRECCIÓN] Compresor de Audio OGG:** Ya comprime correctamente (el motor FFmpeg fallaba al iniciar). Si ocurre un error, ahora se muestra la causa real.
 
 ## Versión 1.5.3

@@ -121,14 +121,26 @@
             <div class="split-workspace" style="align-items: flex-start;">
                 <div class="psych-panel" style="flex: 1;">
                     <h3 style="color: var(--text); margin-top:0;">Configuración</h3>
-                    <p style="font-size: 0.8rem; color:#aaa;">Este algoritmo funciona reduciendo el peso de la imagen en
-                        MegaBytes manteniendo la calidad visual intacta.</p>
+                    <p style="font-size: 0.8rem; color:#aaa;">Reduce el peso como TinyPNG/pngquant: elige la mejor paleta de
+                        colores para tu imagen (protegiendo los colores de zonas pequeñas, como un micrófono o los ojos) y la
+                        comprime al máximo. Al importar tu PNG se calcula un nivel recomendado que puedes cambiar.</p>
 
                     <div class="panel-rango" style="margin-top:20px;">
-                        <label>Paleta de Colores: <span id="valColors" style="color: #b57cff;">256</span>
-                            (Recomendado)</label>
-                        <input type="range" id="sliderCompColors" min="16" max="256" value="256"
-                            oninput="document.getElementById('valColors').textContent = this.value">
+                        <label>Nivel de compresión: <span id="valColors" style="color: #b57cff; font-weight: bold;">--</span></label>
+                        <input type="range" id="sliderCompColors" min="0" max="100" value="22" style="width:100%;">
+                        <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:#888;">
+                            <span>0 = sin pérdida</span><span>más alto = menos peso</span><span>100 = máximo ahorro</span>
+                        </div>
+                        <div id="lblCompQuality" style="font-size: 0.8rem; color: #ccc; margin-top: 6px;">Calidad estimada: --</div>
+                        <div id="boxCompRecommend" style="display:none; margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: rgba(181,124,255,0.08); border: 1px solid rgba(181,124,255,0.35); font-size: 0.8rem; color: #ddd;">
+                            <span id="lblCompRecommend">⭐ Recomendado: --</span>
+                            <button type="button" class="btn-pildora" id="btnCompUseRecommended"
+                                style="margin-left: 6px; padding: 3px 10px; font-size: 0.75rem; border-color:#b57cff; color:#b57cff; background: transparent; cursor:pointer;">Usar recomendado</button>
+                        </div>
+                        <label style="display:flex; align-items:flex-start; gap:6px; margin-top:10px; font-size:0.78rem; color:#ccc; cursor:pointer;">
+                            <input type="checkbox" id="chkCompDither" style="accent-color:#b57cff; margin-top:2px;">
+                            <span><b>Difuminado en degradados</b> (dithering): evita bandas en brillos si usas un nivel alto, pero pesa un poco más. Normalmente no hace falta.</span>
+                        </label>
                     </div>
 
                     <button class="btn-pildora" id="btnRunCompressor"
@@ -160,11 +172,17 @@
                         </div>
                     </div>
 
+                    <div id="lblCompResultInfo" style="font-size: 0.8rem; color: #ccc; margin-bottom: 10px;"></div>
+
                     <div class="inner-glass-box"
-                        style="height: 200px; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+                        style="height: 200px; display:flex; align-items:center; justify-content:center; overflow:hidden; background: repeating-conic-gradient(#333 0% 25%, transparent 0% 50%) 50% / 16px 16px;">
                         <canvas id="canvasCompresorPreview"
                             style="max-width: 100%; max-height: 100%; object-fit: contain;"></canvas>
                     </div>
+                    <button type="button" class="btn-pildora" id="btnCompToggleView"
+                        style="display:none; margin-top: 8px; padding: 6px 14px; font-size: 0.8rem; border-color:#b57cff; color:#b57cff; background: transparent; cursor:pointer;">
+                        👁 Ver original
+                    </button>
                 </div>
             </div>
         </div>
@@ -316,6 +334,7 @@
 
         <script src="js/history.js?v=2"></script>
         <script src="js/main.js?v=2" defer></script>
+        <script src="js/png_optimizer.js?v=2" defer></script>
         <script src="js/compresor.js?v=2" defer></script>
 
         <script>
