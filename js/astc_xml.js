@@ -126,6 +126,7 @@
             const newImg = new Image();
             newImg.onload = () => {
                 imgOriginal = newImg;
+                window.imgBaseOptimizador = null;   // la próxima reducción parte de la textura ya volteada
                 if (typeof renderTimelineSecuenciador === 'function') renderTimelineSecuenciador();
                 if (typeof dibujarContornos === 'function') dibujarContornos();
                 if (typeof renderizarPreviewTiempoReal === 'function') renderizarPreviewTiempoReal();
@@ -135,107 +136,79 @@
         }, 50);
     };
 
+    // Empaquetado en estantes alineado a la rejilla de bloques ASTC (con 2 px de separación):
+    // ningún bloque mezcla píxeles de dos fotogramas, evitando bordes sucios en el juego.
+    // items: [{ key, w, h }] -> { pos: Map(key -> {x, y}), w, h }
+    function empaquetarAstc(items, blockX, blockY) {
+        const PAD = 2;
+        const cellW = (it) => Math.ceil((it.w + PAD) / blockX) * blockX;
+        const cellH = (it) => Math.ceil((it.h + PAD) / blockY) * blockY;
+        const porAltura = [...items].sort((a, b) => b.h - a.h);
+        let totalArea = 0, maxW = 0;
+        for (const it of porAltura) {
+            totalArea += cellW(it) * cellH(it);
+            if (cellW(it) > maxW) maxW = cellW(it);
+        }
+        const maxWidth = Math.max(maxW, Math.ceil(Math.sqrt(totalArea * 1.05) / blockX) * blockX);
+        let x = 0, y = 0, estante = 0, ancho = 0;
+        const pos = new Map();
+        for (const it of porAltura) {
+            if (x > 0 && x + cellW(it) > maxWidth) { x = 0; y += estante; estante = 0; }
+            pos.set(it.key, { x, y });
+            x += cellW(it);
+            if (cellH(it) > estante) estante = cellH(it);
+            if (x > ancho) ancho = x;
+        }
+        return { pos, w: Math.max(blockX, ancho), h: Math.max(blockY, y + estante) };
+    }
+
+    // Peso EXACTO del .astc que se exportaría si la imagen se reduce por el factor f (lo usa js/redimensionar.js):
+    // 16 bytes de cabecera + 16 bytes por bloque.
+    window.OptPesoExacto = function (f) {
+        const blockX = (astcHeader && astcHeader.blockX) || 6;
+        const blockY = (astcHeader && astcHeader.blockY) || 6;
+        const fu = framesUnicos();
+        const pack = empaquetarAstc(fu.unicos.map(s => ({ key: s, w: Math.max(1, Math.round(s.w * f)), h: Math.max(1, Math.round(s.h * f)) })), blockX, blockY);
+        return 16 + Math.ceil(pack.w / blockX) * Math.ceil(pack.h / blockY) * 16;
+    };
+
     // Exportador de ZIP con soporte para .ASTC y .PNG
     window.repackAndExportAstc = async function () {
         if (!spritesDetectados || spritesDetectados.length === 0) {
             return alert("❌ No hay frames para empaquetar.");
         }
 
-        const isOptimized = window.lastResizeFactor && window.lastResizeFactor < 1.0;
+        const isOptimized = (window.totalResizeFactor || 1.0) < 1.0;
 
         if (isOptimized && !window.uploadedAnimationJSON) {
-            const continuar = await new Promise((resolve) => {
-                window.jsonWarningResolve = resolve;
-                const modal = document.getElementById('modalJsonWarning');
-                if (modal) modal.style.display = 'flex';
-                else resolve(true);
-            });
-            if (!continuar) return;
+            if (!(await window.pedirConfirmacionSinJson())) return;
         }
 
-        let jsonExportData = null;
-        if (window.uploadedAnimationJSON) {
-            let finalJson = window.uploadedAnimationJSON.obj;
-            if (isOptimized) {
-                const factor = window.lastResizeFactor || 1.0;
-                const adj = calcularAjustePsychJson(window.uploadedAnimationJSON.rawObj || window.uploadedAnimationJSON.obj, factor);
-                if (adj) finalJson = adj.json;
-            }
-            jsonExportData = { name: window.uploadedAnimationJSON.name, content: JSON.stringify(finalJson, null, "\t") };
-        }
+        // Escala, posición y cámara calculadas con el primer frame real del XML y el rol elegido
+        const adj = obtenerAjusteJsonActual();
+        let jsonExportData = adj ? { name: window.uploadedAnimationJSON.name, content: JSON.stringify(adj.json, null, "\t") } : null;
 
         if (typeof mostrarCargaGlobal === 'function') {
             mostrarCargaGlobal("Empaquetando atlas y deduplicando fotogramas...");
         }
         await new Promise(r => setTimeout(r, 100));
 
-        // Deduplication & Shelf packing
-        let uniqueFrames = [];
-        let duplicatesMap = new Map();
-        let hashMap = new Map();
-
-        for (let s of spritesDetectados) {
-            let tmpCanvas = document.createElement('canvas');
-            tmpCanvas.width = s.w;
-            tmpCanvas.height = s.h;
-            let tmpCtx = tmpCanvas.getContext('2d');
-            tmpCtx.drawImage(imgOriginal, s.x, s.y, s.w, s.h, 0, 0, s.w, s.h);
-            let hash = tmpCanvas.toDataURL();
-            if (hashMap.has(hash)) {
-                let master = hashMap.get(hash);
-                duplicatesMap.set(s.name, master);
-            } else {
-                hashMap.set(hash, s);
-                uniqueFrames.push(s);
-            }
-        }
-
+        // Frames únicos (los repetidos reutilizan la misma zona) y empaquetado alineado a los bloques ASTC
+        const fu = framesUnicos();
+        let uniqueFrames = fu.unicos;
         let dupCount = spritesDetectados.length - uniqueFrames.length;
 
         const blockX = (astcHeader && astcHeader.blockX) || 6;
         const blockY = (astcHeader && astcHeader.blockY) || 6;
+        const pack = empaquetarAstc(uniqueFrames.map(s => ({ key: s, w: s.w, h: s.h })), blockX, blockY);
 
-        // Empaquetado alineado a la rejilla de bloques ASTC (con 2px de separación):
-        // ningún bloque mezcla píxeles de dos fotogramas, evitando bordes sucios en el juego.
-        const PAD = 2;
-        const cellW = (s) => Math.ceil((s.w + PAD) / blockX) * blockX;
-        const cellH = (s) => Math.ceil((s.h + PAD) / blockY) * blockY;
-
-        uniqueFrames.sort((a, b) => b.h - a.h);
-        let totalArea = 0;
-        let maxW = 0;
-        for (let s of uniqueFrames) {
-            totalArea += cellW(s) * cellH(s);
-            if (cellW(s) > maxW) maxW = cellW(s);
-        }
-
-        let idealWidth = Math.ceil(Math.sqrt(totalArea * 1.05) / blockX) * blockX;
-        let maxWidth = Math.max(maxW, idealWidth);
-        let currentX = 0;
-        let currentY = 0;
-        let shelfHeight = 0;
-        let actualMaxWidth = 0;
-
-        for (let s of uniqueFrames) {
-            if (currentX > 0 && currentX + cellW(s) > maxWidth) {
-                currentX = 0;
-                currentY += shelfHeight;
-                shelfHeight = 0;
-            }
-            s.packX = currentX;
-            s.packY = currentY;
-            currentX += cellW(s);
-            if (cellH(s) > shelfHeight) shelfHeight = cellH(s);
-            if (currentX > actualMaxWidth) actualMaxWidth = currentX;
-        }
-
-        let totalHeight = currentY + shelfHeight;
         let packCanvas = document.createElement('canvas');
-        packCanvas.width = actualMaxWidth;
-        packCanvas.height = totalHeight;
+        packCanvas.width = pack.w;
+        packCanvas.height = pack.h;
         let pCtx = packCanvas.getContext('2d');
         for (let s of uniqueFrames) {
-            pCtx.drawImage(imgOriginal, s.x, s.y, s.w, s.h, s.packX, s.packY, s.w, s.h);
+            const p = pack.pos.get(s);
+            pCtx.drawImage(imgOriginal, s.x, s.y, s.w, s.h, p.x, p.y, s.w, s.h);
         }
 
         let baseName = nombreArchivo.replace(/\.[^/.]+$/, "");
@@ -247,22 +220,16 @@
         let nombreZipASTC = baseName + ".astc";
         let nombreZipXML = baseName + ".xml";
 
-        // Generate Sparrow XML
-        let xmlLines = [];
-        xmlLines.push('<?xml version="1.0" encoding="utf-8"?>');
-        xmlLines.push('<TextureAtlas imagePath="' + nombreZipPNG + '">');
-        xmlLines.push('<!-- Spritesheet Generator FNF LaloCF (Modo ASTC Android) -->\t');
-        xmlLines.push('<!-- https://lalocf2.github.io/spritesheet-generator-fnf/ -->\t');
-
-        let exportSprites = [...spritesDetectados];
-        exportSprites.sort((a, b) => a.name.localeCompare(b.name));
-        exportSprites.forEach((s) => {
-            let target = duplicatesMap.has(s.name) ? duplicatesMap.get(s.name) : s;
-            let rot = (s.angle === 90 || s.angle === 270) ? ' rotated="true"' : '';
-            xmlLines.push('\t<SubTexture name="' + s.name + '" x="' + target.packX + '" y="' + target.packY + '" width="' + target.w + '" height="' + target.h + '" frameX="' + s.frameX + '" frameY="' + s.frameY + '" frameWidth="' + s.frameWidth + '" frameHeight="' + s.frameHeight + '"' + rot + '/>');
+        // Sparrow XML en el orden original (Psych usa el primer frame como centro del personaje)
+        let xml = construirXmlSparrow(nombreZipPNG, (s) => {
+            const target = fu.repetidoDe.get(s) || s;
+            const p = pack.pos.get(target);
+            return { x: p.x, y: p.y, w: target.w, h: target.h };
         });
-        xmlLines.push('</TextureAtlas>');
-        let xml = xmlLines.join('\r\n');
+        let informe = (isOptimized || adj) ? construirInformeOptimizacion({
+            baseName, atlasW: packCanvas.width, atlasH: packCanvas.height, dupCount, adj,
+            extra: `Textura ASTC: bloques ${blockX}x${blockY} (incluye copia PNG de respaldo)`
+        }) : null;
 
         // Encode to ASTC
         if (typeof mostrarCargaGlobal === 'function') {
@@ -296,6 +263,7 @@
             if (jsonExportData) {
                 zip.file(jsonExportData.name, jsonExportData.content);
             }
+            if (informe) zip.file("informe_optimizacion.txt", informe);
 
             const content = await zip.generateAsync({ type: "blob" });
             const aZip = document.createElement('a');
@@ -316,8 +284,9 @@
                       `  - ${nombreZipPNG} (Copia PNG de respaldo)\n` +
                       `  - ${nombreZipXML} (Sparrow XML)\n`;
             if (jsonExportData) {
-                msg += `  - ${jsonExportData.name} (JSON de Psych Engine calibrado)\n`;
+                msg += `  - ${jsonExportData.name} (escala ${adj.newScale}, posición [${adj.newPos.join(', ')}], cámara [${adj.newCamPos.join(', ')}])\n`;
             }
+            if (informe) msg += `  - informe_optimizacion.txt (qué cambió y qué sigue igual)\n`;
             alert(msg);
         }, 'image/png');
     };

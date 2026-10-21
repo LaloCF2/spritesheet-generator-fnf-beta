@@ -818,6 +818,10 @@ function loadMainImage(file, callback) {
     if (!file) return; mostrarCargaGlobal("Cargando imagen PNG..."); nombreArchivo = file.name;
     window.lastResizeFactor = 1.0;
     window.totalResizeFactor = 1.0;
+    window.atlasFrame0Original = null;
+    window.spritesOriginales = null;
+    window.imgBaseOptimizador = null;
+    window.resolucionOriginal = null;
     const reader = new FileReader();
     reader.onload = (event) => {
         imgOriginal = new Image();
@@ -932,9 +936,17 @@ function parseSparrowXML(xmlString) {
             frameX: parseInt(st.getAttribute("frameX")) || 0, frameY: parseInt(st.getAttribute("frameY")) || 0,
             frameWidth: fw, frameHeight: fh,
             origFrameWidth: fw, origFrameHeight: fh,
-            angle: st.getAttribute("rotated") === "true" ? 90 : 0
+            angle: st.getAttribute("rotated") === "true" ? 90 : 0,
+            _id: i
         });
     }
+    // Psych Engine toma el PRIMER frame del XML como centro del personaje y como caja que sigue la cámara:
+    // se guarda el original para compensar el JSON aunque luego se reduzca o se reordene el atlas.
+    let s0 = spritesDetectados[0];
+    window.atlasFrame0Original = s0 ? { name: s0.name, fw: s0.frameWidth, fh: s0.frameHeight } : null;
+    window.spritesOriginales = spritesDetectados.map(s => ({ ...s }));
+    window.imgBaseOptimizador = null;
+    window.resolucionOriginal = (imgOriginal && imgOriginal.width) ? { w: imgOriginal.width, h: imgOriginal.height } : null;
 }
 
 function finalizarCargaGeneral(mode) {

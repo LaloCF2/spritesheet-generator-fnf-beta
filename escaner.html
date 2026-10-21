@@ -10,8 +10,8 @@
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/components.css">
     <link rel="stylesheet" href="css/windows.css">
-    <link rel="stylesheet" href="css/ui.css?v=1">
-    <script src="js/ui.js?v=1"></script>
+    <link rel="stylesheet" href="css/ui.css?v=3">
+    <script src="js/ui.js?v=2"></script>
 
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#020308">
@@ -215,50 +215,52 @@
                     Renombrar Marcados</button>
             </div>
 
-            <div class="resize-bar inner-glass-box"
-                style="display:flex; flex-wrap:wrap; gap:10px; padding:10px; margin-bottom: 10px; align-items:center;">
-                <span id="lblResizeCurrent"
-                    style="color:var(--text); font-size:0.9rem; font-weight:bold; min-width: 180px;"><img
-                        src="https://cdn-icons-png.flaticon.com/128/3114/3114883.png" class="icon-sm" alt="Size">
-                    Tamaño: -- x --</span>
-
-                <select id="selResizeFactor" class="inner-glass-box" style="flex:1;"
-                    onchange="toggleCustomResizeInput()">
-                    <option value="recommend">Recomendado (Automático)</option>
-                    <option value="0.9">Reducir a 90%</option>
-                    <option value="0.75">Reducir a 75%</option>
-                    <option value="0.6">Reducir a 60%</option>
-                    <option value="0.5">Reducir a (50%)</option>
-                    <option value="0.4">Reducir a 40%</option>
-                    <option value="custom">Personalizado...</option>
-                </select>
-                <input type="number" id="inpResizeCustom" class="inner-glass-box" style="display:none; width: 70px;"
-                    placeholder="%" min="1" max="100">
-
-                <button class="btn-pildora" style="background:var(--accent-pink); color:white; border:none;"
-                    onclick="aplicarResizeOptimizador()"><img
-                        src="https://cdn-icons-png.flaticon.com/128/8208/8208316.png" class="icon"
-                        style="filter: brightness(0) invert(1);" alt="Resize"> Optimizar Tamaño</button>
-            </div>
-
-            <!-- NUEVO: Selector de JSON integrado en la interfaz -->
-            <div class="json-import-bar inner-glass-box"
-                style="display:flex; flex-wrap:wrap; gap:10px; padding:10px; margin-bottom: 20px; align-items:center; background: rgba(255,255,255,0.2);">
-                <label style="color:var(--text); font-size:0.9rem; font-weight:bold; min-width: 180px; display:flex; align-items:center;">
-                    <img src="https://cdn-icons-png.flaticon.com/128/136/136525.png" class="icon-sm" alt="JSON">
-                    Importar .JSON (Opcional):
-                </label>
-                <input type="file" id="jsonUpdateUpload" class="hidden-file" accept=".json" style="display:none;">
-                <button class="btn-pildora btn-secundario" id="btnUploadJson"
-                    style="flex:1; border-color:#00e5ff; color:var(--text); padding: 10px 18px;"
-                    onclick="document.getElementById('jsonUpdateUpload').click();">
-                    <img src="https://cdn-icons-png.flaticon.com/128/136/136525.png" class="icon-sm" alt="JSON">
-                    <span id="txtUploadJson">Subir Archivo .JSON</span>
-                </button>
-                <div id="lblJsonUploaded"
-                    style="width: 100%; font-size:0.85rem; color:var(--text); display:none; margin-top:5px; padding: 10px 14px; background: rgba(0, 229, 255, 0.08); border-radius: 8px; border: 1px solid rgba(0, 229, 255, 0.25);">
-                    <img src="https://cdn-icons-png.flaticon.com/512/190/190411.png" class="icon-sm"> Listo
+            <!-- Reducir resolución + JSON del personaje (Psych Engine) -->
+            <div class="opt-panel">
+                <div class="opt-step">
+                    <div class="opt-step-head">
+                        <span class="opt-num">1</span>
+                        <div class="opt-step-title">
+                            <b>Reducir resolución</b>
+                            <small>La imagen pesa menos y el XML se ajusta solo.</small>
+                        </div>
+                        <span id="lblResizeCurrent" class="opt-chip"><img
+                                src="https://cdn-icons-png.flaticon.com/128/3114/3114883.png" class="icon-sm"
+                                alt="Size"> Tamaño: -- x --</span>
+                    </div>
+                    <div id="rsTool" class="rs-tool"><div class="opt-hint">Sube la imagen y el XML para ver los tamaños.</div></div>
                 </div>
+
+                <div class="opt-step">
+                    <div class="opt-step-head">
+                        <span class="opt-num">2</span>
+                        <div class="opt-step-title">
+                            <b>JSON del personaje <span class="opt-optional">opcional</span></b>
+                            <small>Ajusta escala, posición y cámara para que en el juego se vea idéntico.</small>
+                        </div>
+                    </div>
+                    <div class="opt-row">
+                        <input type="file" id="jsonUpdateUpload" class="hidden-file" accept=".json,application/json"
+                            style="display:none;">
+                        <button class="btn-pildora btn-secundario" id="btnUploadJson"
+                            onclick="document.getElementById('jsonUpdateUpload').click();">
+                            <img src="https://cdn-icons-png.flaticon.com/128/136/136525.png" class="icon-sm" alt="JSON">
+                            <span id="txtUploadJson">Subir .JSON del personaje</span>
+                        </button>
+                        <label class="opt-role">Lugar en la canción
+                            <select id="selCharRole" onchange="cambiarRolPersonaje()">
+                                <option value="auto">Automático</option>
+                                <option value="player">Jugador (BF)</option>
+                                <option value="opponent">Oponente (Dad)</option>
+                                <option value="gf">Acompañante (GF)</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div id="lblJsonUploaded" style="display:none;"></div>
+                </div>
+
+                <div class="opt-foot"><span class="opt-num opt-num-sm">3</span> Descarga todo con <b>Descargar ZIP</b>
+                    (arriba): imagen, XML y JSON con sus nombres originales, más un informe de los cambios.</div>
             </div>
 
             <div class="timeline-panel" id="timelineContainer"></div>
@@ -442,15 +444,13 @@
                             style="margin-bottom:0;" alt="Warning"> Advertencia</h2>
                 </div>
                 <div class="modal-body" style="color:var(--text);">
-                    <p>Se ha reducido el tamaño de la imagen, pero <b>no importaste ningún archivo .JSON</b> para
-                        corregir las coordenadas.</p>
-                    <p>Si exportas ahora, la imagen y el XML estarán bien, pero las animaciones dentro del juego podrían
-                        verse desalineadas (offset incorrecto).</p>
-                    <p style="margin-top:20px; font-weight:bold;">¿Deseas continuar la exportación sin el JSON?</p>
+                    <p>Redujiste la imagen al <b id="lblJsonWarnPct">50%</b>, pero <b>no subiste el .JSON del personaje</b>.</p>
+                    <p>La imagen y el XML quedarán bien, pero en el juego el personaje se verá <b>más pequeño y movido de lugar</b>, porque su escala, posición y cámara siguen siendo las del tamaño original.</p>
+                    <p style="margin-top:20px; font-weight:bold;">¿Exportar de todas formas sin el JSON?</p>
                 </div>
                 <div class="modal-footer" style="display:flex; gap:10px; justify-content:center; margin-top:20px;">
                     <button class="btn-pildora btn-secundario" style="flex:1;"
-                        onclick="resolverModalJsonWarning(false)">Regresar</button>
+                        onclick="resolverModalJsonWarning(false)">Regresar y subir JSON</button>
                     <button class="btn-pildora btn-export" style="flex:1;" onclick="resolverModalJsonWarning(true)">Sí,
                         continuar</button>
                 </div>
@@ -492,11 +492,12 @@
             </div>
         </div>
 
-        <script src="js/history.js?v=2"></script>
-        <script src="js/main.js?v=2" defer></script>
+        <script src="js/history.js?v=4"></script>
+        <script src="js/main.js?v=4" defer></script>
         <script src="js/escaner.js?v=2" defer></script>
-        <script src="js/psych_json.js" defer></script>
-        <script src="js/optimizador.js" defer></script>
+        <script src="js/psych_json.js?v=3" defer></script>
+        <script src="js/optimizador.js?v=4" defer></script>
+        <script src="js/redimensionar.js?v=1" defer></script>
 
         <script>
             if ('serviceWorker' in navigator) {

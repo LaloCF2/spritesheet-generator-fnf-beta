@@ -34,6 +34,19 @@
   - **Nivel de compresión 0-100** (más alto = menos peso; 0 = sin pérdida) con **nivel recomendado automático** al importar, que detecta brillos/degradados grandes para que no salgan bandas, y calidad estimada en vivo al mover la barra.
   - Vista previa del resultado real con botón para comparar con el original, y difuminado (dithering) opcional para degradados.
 - **[CORRECCIÓN] Compresor de Audio OGG:** Ya comprime correctamente (el motor FFmpeg fallaba al iniciar). Si ocurre un error, ahora se muestra la causa real.
+- **[CORRECCIÓN] Optimizador - JSON del personaje (Psych Engine):**
+  - Al reducir la resolución, la **posición y la cámara** ya quedan idénticas al original. Antes el XML se ordenaba alfabéticamente al exportar y eso cambiaba el **primer frame**, que Psych Engine usa como centro del personaje (para la escala) y como caja que sigue la cámara. Con `bf-night` el personaje quedaba 152 px movido y la cámara 313 px desviada; ahora la diferencia es de menos de 2 px.
+  - El XML se exporta siempre en el mismo orden de la lista y el cálculo de `scale`, `position` y `camera_position` usa el primer frame real del XML (aunque muevas o borres frames).
+  - Nuevo selector **"Lugar en la canción"** (Automático / Jugador / Oponente / GF): la cámara se calcula distinto según dónde se use el personaje.
+  - **Verificación automática:** simula todos los frames en Psych Engine antes y después y muestra cuántos píxeles se mueven el personaje y la cámara.
+  - Avisos si el JSON es de pixel art (`no_antialiasing`) o si su campo `image` no coincide con la imagen subida.
+- **[MEJORA] Optimizador:**
+  - Panel en pasos: **1 Reducir resolución** (con vista previa del tamaño final y de la nueva escala), **2 JSON del personaje** (tabla antes → después) y **3 Descargar ZIP**.
+  - Reducir varias veces ya no acumula errores de redondeo: la imagen se reescala siempre desde la original en una sola pasada (más nítida).
+  - El atlas reempaquetado deja 2 px entre frames para que el suavizado del juego no tome píxeles del frame vecino.
+  - El ZIP conserva los nombres originales (el campo `image` del JSON los encuentra sin renombrar) e incluye `informe_optimizacion.txt` con lo que cambió y lo que sigue igual.
+  - Corregido: en el Optimizador ASTC + XML el aviso "exportar sin JSON" se quedaba colgado y no descargaba nada.
+  - Corregido: las flechas ↑↓, borrar y "Renombrar Marcados" del Secuenciador fallaban antes de actualizar la lista.
 
 ## Versión 1.5.3
 - **[CORRECCIÓN] Transparencia Nativa 100% en Exportación de GIFs:**

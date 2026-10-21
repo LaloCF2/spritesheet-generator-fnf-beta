@@ -61,8 +61,8 @@
         audio: {
             c: C.audio, icon: '🎵', kicker: 'Audio · OGG', name: 'Compresor de Audio',
             title: 'Compresor de <span class="ui-grad">Audio OGG</span>',
-            desc: 'Reduce el peso de tus canciones y voces convirtiéndolas a OGG Vorbis con la calidad que elijas.',
-            steps: ['Sube tu audio', 'Elige la calidad', 'Descarga el OGG'], win: '#win-audio'
+            desc: 'Reduce el peso de tus canciones y voces (hasta 3 a la vez o un .zip). Reconoce Inst y Voices y las guarda en la carpeta de la canción.',
+            steps: ['Sube audios o un .zip', 'Elige la calidad', 'Descarga OGG o ZIP'], win: '#win-audio'
         },
         atlas: {
             c: C.atlas, icon: '🧩', kicker: 'Adobe Animate · Atlas', name: 'Conversor Animate Atlas',

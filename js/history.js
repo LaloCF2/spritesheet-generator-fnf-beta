@@ -107,6 +107,11 @@ window.autoSaveHistory = function () {
     if (window.imgOriginal && window.imgOriginal.src && window.imgOriginal.src.startsWith('data:')) {
         data.imgSrc = window.imgOriginal.src;
         data.sprites = window.spritesDetectados || [];
+        data.optState = {
+            totalResizeFactor: window.totalResizeFactor || 1.0,
+            atlasFrame0Original: window.atlasFrame0Original || null,
+            spritesOriginales: window.spritesOriginales || null
+        };
     }
 
     if (window.appMode === 'AUDIO' && window.oggFileOriginal) {
@@ -245,6 +250,13 @@ window.restoreHistorySession = async function (id) {
                 window.imgOriginal = new Image();
                 window.imgOriginal.onload = () => {
                     window.spritesDetectados = session.sprites || [];
+                    if (session.optState) {
+                        window.totalResizeFactor = session.optState.totalResizeFactor || 1.0;
+                        window.lastResizeFactor = window.totalResizeFactor;
+                        window.atlasFrame0Original = session.optState.atlasFrame0Original || null;
+                        window.spritesOriginales = session.optState.spritesOriginales || null;
+                        window.imgBaseOptimizador = null;
+                    }
                     let canvas = document.getElementById('canvasSprites');
                     if (canvas) {
                         canvas.width = window.imgOriginal.width;
@@ -266,12 +278,16 @@ window.restoreHistorySession = async function (id) {
         }
         else if (session.appMode === 'AUDIO') {
             if (session.audioFile) {
-                window.oggFileOriginal = session.audioFile;
-                window.oggFileName = session.audioFile.name;
-                document.getElementById('txtAudioOrigSize').textContent = (session.audioFile.size / 1024 / 1024).toFixed(2) + " MB";
-                document.getElementById('btnDownloadAudio').style.display = 'none';
-                document.getElementById('btnRunAudio').style.display = 'block';
-                if (typeof window.detectBPM === 'function') window.detectBPM(session.audioFile);
+                if (typeof window.audioAgregarArchivos === 'function') {
+                    window.audioAgregarArchivos([session.audioFile]);
+                } else {
+                    window.oggFileOriginal = session.audioFile;
+                    window.oggFileName = session.audioFile.name;
+                    document.getElementById('txtAudioOrigSize').textContent = (session.audioFile.size / 1024 / 1024).toFixed(2) + " MB";
+                    document.getElementById('btnDownloadAudio').style.display = 'none';
+                    document.getElementById('btnRunAudio').style.display = 'block';
+                    if (typeof window.detectBPM === 'function') window.detectBPM(session.audioFile);
+                }
             }
             if (typeof window.initMode === 'function') window.initMode('AUDIO');
             ocultarCargaGlobal();

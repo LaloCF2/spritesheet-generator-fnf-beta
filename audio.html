@@ -10,8 +10,8 @@
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/components.css">
     <link rel="stylesheet" href="css/windows.css">
-    <link rel="stylesheet" href="css/ui.css?v=1">
-    <script src="js/ui.js?v=1"></script>
+    <link rel="stylesheet" href="css/ui.css?v=3">
+    <script src="js/ui.js?v=2"></script>
 
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#020308">
@@ -109,20 +109,35 @@
                     style="filter: brightness(0) saturate(100%) invert(67%) sepia(98%) saturate(1906%) hue-rotate(359deg) brightness(101%) contrast(105%);"
                     alt="Audio"> Optimizador de Audio (.OGG)</h2>
 
-            <div style="display:flex; width: 100%; gap:10px; margin-bottom: 20px;">
-                <input type="file" id="audioUpload" class="hidden-file" accept="audio/ogg, audio/mpeg, .ogg, .mp3">
-                <button class="btn-pildora"
+            <div class="au-upload">
+                <input type="file" id="audioUpload" class="hidden-file" multiple
+                    accept=".ogg,.mp3,.wav,.zip,audio/*,application/zip,application/x-zip-compressed">
+                <button class="btn-pildora" id="btnSubirAudio"
                     style="flex:1; padding: 15px; font-size: 1rem; background: #ffaa00; color: #000; border:none;"
                     onclick="document.getElementById('audioUpload').click();">
                     <img src="https://cdn-icons-png.flaticon.com/512/716/716784.png" class="icon icon-black"
-                        alt="Upload"> SELECCIONAR CANCIÓN / VOZ (.OGG / .MP3)
+                        alt="Upload"> SUBIR AUDIOS (.OGG / .MP3) O .ZIP
                 </button>
+            </div>
+            <div class="au-ayuda">
+                Hasta <b>3 audios</b> a la vez (por ejemplo Inst, Voices-Player y Voices-Opponent de una canción) o
+                un <b>.zip</b> con carpetas de canciones. Si se llaman <b>Inst</b> o <b>Voices</b> (con mayúsculas o
+                minúsculas) te pido el nombre de la canción y se descargan dentro de su carpeta.
+            </div>
+
+            <div class="psych-panel au-panel">
+                <div class="au-panel-head">
+                    <h3 style="margin:0;">Audios</h3>
+                    <button type="button" class="rs-link" id="btnLimpiarAudio" onclick="limpiarAudios()"
+                        style="display:none;">Quitar todos</button>
+                </div>
+                <div id="audioLista" class="au-lista"></div>
             </div>
 
             <div class="split-workspace" style="align-items: flex-start;">
                 <div class="psych-panel" style="flex: 1; border-color:#ffaa00;">
                     <h3 style="color: var(--text); margin-top:0;">Nivel de Compresión</h3>
-                    <p style="font-size: 0.8rem; color:#aaa;">Elige qué tanto deseas exprimir el archivo. El motor usará
+                    <p style="font-size: 0.8rem; color:#aaa;">Se aplica a todos los audios de la lista. El motor usará
                         codificación Vorbis nativa para FNF.</p>
 
                     <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
@@ -133,8 +148,7 @@
                             <div>
                                 <b style="color:var(--text);">Optimizado</b>
                                 <div style="font-size:0.75rem; color:var(--text-muted);">Baja el peso a la mitad.
-                                    Conserva excelente
-                                    calidad. (128 kbps)</div>
+                                    Conserva excelente calidad. (128 kbps)</div>
                             </div>
                         </label>
 
@@ -144,8 +158,7 @@
                             <div>
                                 <b style="color:var(--text);">Equilibrado</b>
                                 <div style="font-size:0.75rem; color:var(--text-muted);">Calidad de mod estándar, peso
-                                    muy bajo. (80
-                                    kbps)</div>
+                                    muy bajo. (80 kbps)</div>
                             </div>
                         </label>
 
@@ -155,8 +168,7 @@
                             <div>
                                 <b style="color:var(--text);">Máximo (Exprimido)</b>
                                 <div style="font-size:0.75rem; color:var(--text-muted);">La calidad disminuye, pero el
-                                    peso es
-                                    mínimo. (48 kbps)</div>
+                                    peso es mínimo. (48 kbps)</div>
                             </div>
                         </label>
                     </div>
@@ -165,20 +177,20 @@
                         style="width:100%; margin-top: 20px; display:none; background: #ffaa00; color:black; border:none;"
                         onclick="ejecutarCompresionAudio()">
                         <img src="https://cdn-icons-png.flaticon.com/128/11252/11252744.png" class="icon icon-black"
-                            alt="Procesar"> INICIAR COMPRESIÓN OGG
+                            alt="Procesar"> COMPRIMIR AUDIOS (UNO POR UNO)
                     </button>
 
                     <button class="btn-pildora" id="btnDownloadAudio"
                         style="width:100%; margin-top: 20px; display:none; background: var(--accent-psych); color:black; border:none;">
                         <img src="https://cdn-icons-png.flaticon.com/128/892/892303.png" class="icon icon-black"
-                            alt="Bajar"> DESCARGAR AUDIO OPTIMIZADO
+                            alt="Bajar"> DESCARGAR AUDIOS OPTIMIZADOS
                     </button>
                 </div>
 
                 <div class="psych-panel" style="flex: 1; text-align: center; border-color: #ffaa00;">
-                    <h3 style="color: var(--text); margin-top:0;">Resultados del Audio</h3>
+                    <h3 style="color: var(--text); margin-top:0;">Resultados</h3>
 
-                    <div style="display:flex; justify-content: space-around; margin: 20px 0;">
+                    <div style="display:flex; justify-content: space-around; margin: 20px 0; gap: 10px; flex-wrap: wrap;">
                         <div>
                             <div style="font-size: 0.8rem; color:#aaa;">Peso Original</div>
                             <div id="txtAudioOrigSize" style="font-size: 1.5rem; font-weight:bold; color:#ff4d88;">---
@@ -197,11 +209,10 @@
                     </div>
 
                     <div class="inner-glass-box"
-                        style="height: 150px; display:flex; flex-direction:column; align-items:center; justify-content:center; overflow:hidden;">
+                        style="min-height: 110px; display:flex; flex-direction:column; align-items:center; justify-content:center; overflow:hidden; gap: 8px;">
                         <img src="https://cdn-icons-png.flaticon.com/512/862/862700.png" class="icon-lg icon-black">
-                        <p style="color: var(--text-muted); font-weight:bold; font-size: 0.9rem; margin-top: 10px;">
-                            Motor FFmpeg
-                            Vorbis</p>
+                        <p id="txtAudioDetalle" style="color: var(--text-muted); font-weight:bold; font-size: 0.9rem; margin: 0;">
+                            Sin audios.</p>
                     </div>
                 </div>
             </div>
@@ -352,9 +363,9 @@
             </div>
         </div>
 
-        <script src="js/history.js?v=2"></script>
-        <script src="js/main.js?v=2" defer></script>
-        <script src="js/audio.js?v=2" defer></script>
+        <script src="js/history.js?v=4"></script>
+        <script src="js/main.js?v=4" defer></script>
+        <script src="js/audio.js?v=3" defer></script>
 
         <script>
             if ('serviceWorker' in navigator) {
