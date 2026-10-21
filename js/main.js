@@ -27,7 +27,7 @@ window.showChangelog = function (onlyLatest = false) {
 
     if (typeof CHANGELOG_DATA === 'undefined') {
         let script = document.createElement('script');
-        script.src = 'js/changelog.js?v=' + CURRENT_VERSION;
+        script.src = 'js/changelog.js?v=' + CURRENT_VERSION + '-r3';
         script.onload = () => window.showChangelog(onlyLatest);
         document.head.appendChild(script);
         return;

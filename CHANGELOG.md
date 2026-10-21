@@ -47,6 +47,20 @@
   - El ZIP conserva los nombres originales (el campo `image` del JSON los encuentra sin renombrar) e incluye `informe_optimizacion.txt` con lo que cambió y lo que sigue igual.
   - Corregido: en el Optimizador ASTC + XML el aviso "exportar sin JSON" se quedaba colgado y no descargaba nada.
   - Corregido: las flechas ↑↓, borrar y "Renombrar Marcados" del Secuenciador fallaban antes de actualizar la lista.
+- **[NUEVO] Optimizador - Reducir resolución con 5 modos** (también en el Escáner y en el Optimizador ASTC + XML):
+  - **⚡ Fácil:** tres tarjetas, Grande (75%), Medio (50%) y Pequeño (35%), con la resolución final y el peso de cada una; se marca la recomendada para tu imagen.
+  - **% Porcentaje:** recomendados según la imagen (que quepa en 4096 o 2048 px, la mitad exacta, reducción ligera...), **Ver más** (del 90% al 10%) y **Personalizado**.
+  - **⇲ Alto × Ancho:** resoluciones recomendadas, **Ver más** con todas las medidas comunes que caben en tu imagen y **Personalizado** (al escribir el ancho se calcula el alto para no deformar al personaje).
+  - **💾 Peso:** elige cuánto quieres que pese (recomendados, Ver más o Personalizado en MB/KB) y se calcula la resolución midiendo el PNG real que se va a descargar. En el Optimizador ASTC el peso del `.astc` es exacto.
+  - **🎯 Resolución + Peso:** límites de ancho, alto y peso juntos; se usa el tamaño más grande que cumpla todos.
+  - Resumen antes de aplicar (resolución final, peso y nueva escala del JSON), aviso si pasa de 4096 px y botón **Volver al tamaño original** sin pérdida de calidad.
+  - Detección de frames repetidos más rápida (compara píxeles en lugar de convertir cada frame a PNG).
+- **[NUEVO] Compresor de Audio por lotes:**
+  - Sube **hasta 3 audios** a la vez (.ogg, .mp3, .wav) o un **.zip con carpetas** de canciones; se comprimen **uno por uno** con barra de progreso.
+  - Reconoce **Inst** y **Voices** sin importar mayúsculas o minúsculas (`INST.ogg`, `voices_player.ogg`, `Voices-bf.ogg`...). Si son dos Voices se guardan como **Voices-Player** y **Voices-Opponent** (puedes cambiar el tipo de cada audio en la lista).
+  - **Pregunta el nombre de la canción** y descarga un `.zip` con su carpeta (por ejemplo `dad-battle/Inst.ogg`), con opción de formato de carpeta de Psych Engine (minúsculas y guiones). En un `.zip` se usa el nombre de cada carpeta.
+  - Si un audio ya pesaba menos que comprimido, se deja el original para no perder calidad. Los `.mp3` con portada ya no fallan.
+  - Avisos y errores para cada caso (más de 3 audios, archivos que no son audio, `.zip` dañado, nombres repetidos, errores del motor), también en el Registro de actividad.
 
 ## Versión 1.5.3
 - **[CORRECCIÓN] Transparencia Nativa 100% en Exportación de GIFs:**
